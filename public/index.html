@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jk-go</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            padding: 20px;
+        }
+        
+        .container {
+            display: flex;
+            gap: 40px;
+            max-width: 1200px;
+            width: 100%;
+        }
+        
+        .game-section {
+            flex: 1;
+        }
+        
+        .info-section {
+            flex: 0 0 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .game-info {
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .board {
+            display: grid;
+            grid-template-columns: repeat(6, 60px);
+            grid-template-rows: repeat(6, 60px);
+            gap: 2px;
+            background-color: #8B4513;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            margin: 0 auto;
+            position: relative;
+        }
+        
+        .cell {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            border-radius: 3px;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        /* Region Farben - 9 verschiedene Pastellfarben */
+        .region-0 { background-color: #FFE4E1; } /* Misty Rose */
+        .region-1 { background-color: #FDF5E6; } /* Old Lace */
+        .region-2 { background-color: #F0FFF0; } /* Honeydew */
+        .region-3 { background-color: #F5F5DC; } /* Beige */
+        .region-4 { background-color: #F0F8FF; } /* Alice Blue */
+        .region-5 { background-color: #FFF8DC; } /* Cornsilk */
+        .region-6 { background-color: #E6E6FA; } /* Lavender */
+        .region-7 { background-color: #FAF0E6; } /* Linen */
+        .region-8 { background-color: #FFF0F5; } /* Lavender Blush */
+        
+        .cell:hover {
+            filter: brightness(0.9);
+            transform: scale(1.05);
+            z-index: 1;
+        }
+        
+        .piece {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 2;
+        }
+        
+        .white {
+            background: linear-gradient(135deg, #ffffff, #e0e0e0);
+            border: 2px solid #c0c0c0;
+        }
+        
+        .black {
+            background: linear-gradient(135deg, #2c2c2c, #000000);
+            border: 2px solid #1a1a1a;
+        }
+        
+        .region-border {
+            position: absolute;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .region-highlight {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(255, 255, 0, 0.2);
+            pointer-events: none;
+            z-index: 0;
+            border-radius: 3px;
+        }
+        
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #45a049;
+        }
+        
+        .btn-secondary {
+            background-color: #008CBA;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #007B9A;
+        }
+        
+        .status {
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        
+        .waiting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .playing {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
+        .finished {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .player-info {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        
+        input {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .games-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        
+        .game-item {
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .game-item:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            margin-right: 5px;
+            border-radius: 2px;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes glow {
+            0% { box-shadow: 0 0 5px currentColor; }
+            50% { box-shadow: 0 0 20px currentColor; }
+            100% { box-shadow: 0 0 5px currentColor; }
+        }
+        
+        .winning-piece {
+            animation: pulse 1s infinite, glow 2s infinite;
+        }
+        
+        .region-complete {
+            animation: glow 2s infinite;
+            position: relative;
+        }
+        
+        .region-complete::after {
+            content: "✓";
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            color: green;
+            font-weight: bold;
+            font-size: 12px;
+            z-index: 3;
+        }
+
+        /* CSS-Stile für Chat: */
+        .chat-container {
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .chat-header {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            font-weight: bold;
+        }
+        
+        .chat-messages {
+            height: 200px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #f9f9f9;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 8px;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        
+        .player-name {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        .player-color {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        
+        .player-white .player-color {
+            background: white;
+            border: 1px solid #ccc;
+        }
+        
+        .player-black .player-color {
+            background: black;
+            border: 1px solid #333;
+        }
+        
+        .message-time {
+            color: #666;
+            font-size: 11px;
+            margin-left: auto;
+        }
+        
+        .message-text {
+            word-wrap: break-word;
+            line-height: 1.4;
+        }
+        
+        .chat-input-container {
+            display: flex;
+            padding: 10px;
+            background: white;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        .chat-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        .send-button {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .send-button:hover {
+            background: #45a049;
+        }
+        
+        .send-button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .system-message {
+            background: #fff3cd;
+            border-left: 3px solid #ffc107;
+        }
+        
+        .system-message .message-header {
+            color: #856404;
+        }
+        
+        .new-message-indicator {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #ff4444;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 1s infinite;
+        }
+        
+        .chat-tab {
+            position: relative;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>jk-go - 6x6 Brettspiel + Chat</h1>
+    
+    <div class="container">
+        <div class="game-section">
+            <div class="game-info" id="gameInfo">Verbinde mit Spiel...</div>
+            <div class="board" id="gameBoard"></div>
+            <div class="status" id="status">Bitte erstelle oder betrete ein Spiel</div>
+            <div class="controls">
+                <button id="createGameBtn" class="btn-primary">Neues Spiel erstellen</button>
+                <button id="refreshGamesBtn" class="btn-secondary">Spiele aktualisieren</button>
+                <!-- ergibt iwie keinen Sinn -->
+                <!-- <button id="toggleRegionsBtn" class="btn-secondary">Regionen anzeigen/verstecken</button> -->
+            </div>
+            
+            <div class="legend" id="regionLegend" style="display: none;">
+                <div class="legend-item"><div class="legend-color region-0"></div> Region 1</div>
+                <div class="legend-item"><div class="legend-color region-1"></div> Region 2</div>
+                <div class="legend-item"><div class="legend-color region-2"></div> Region 3</div>
+                <div class="legend-item"><div class="legend-color region-3"></div> Region 4</div>
+                <div class="legend-item"><div class="legend-color region-4"></div> Region 5</div>
+                <div class="legend-item"><div class="legend-color region-5"></div> Region 6</div>
+                <div class="legend-item"><div class="legend-color region-6"></div> Region 7</div>
+                <div class="legend-item"><div class="legend-color region-7"></div> Region 8</div>
+                <div class="legend-item"><div class="legend-color region-8"></div> Region 9</div>
+            </div>
+            
+            <!-- Chat-Container -->
+            <div class="chat-container">
+                <div class="chat-header">
+                    <span class="chat-tab" id="chatTab">
+                        Spiel-Chat 
+                        <span class="new-message-indicator" id="newMessageIndicator" style="display: none;">!</span>
+                    </span>
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="chat-message system-message">
+                        <div class="message-header">System</div>
+                        <div class="message-text">Willkommen! Der Chat ist bereit.</div>
+                    </div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" class="chat-input" id="chatInput" placeholder="Nachricht eingeben..." maxlength="500">
+                    <button class="send-button" id="sendButton">Senden</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="info-section">
+            <h3>Spielinformationen</h3>
+            <div class="player-info">
+                <input type="text" id="playerName" placeholder="Dein Name" value="Spieler">
+                <div id="playerColorInfo">Farbe: -</div>
+                <div id="playerIdInfo">Spieler ID: -</div>
+            </div>
+            
+            <h4>Verfügbare Spiele</h4>
+            <div class="games-list" id="gamesList">
+                <div>Lade Spiele...</div>
+            </div>
+            
+            <div class="controls">
+                <button id="autoJoinBtn" class="btn-secondary">Automatisch beitreten</button>
+            </div>
+            
+            <div style="margin-top: 20px; padding: 10px; background: #e9ecef; border-radius: 5px;">
+                <h4>Siegbedingungen:</h4>
+                <ul style="font-size: 12px; margin: 5px 0; padding-left: 15px;">
+                    <li>5 Steine in einer Reihe</li>
+                    <li>3×2 oder 2x3 Rechteck bilden</li>
+                    <li>2 Regionen komplett abdecken</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin + '/api';
+        
+        // Regionen Definition (2x2 Blöcke)
+        const REGIONS = [
+            // Zeile 0-1
+            { id: 0, rows: [0, 1], cols: [0, 1], color: 'region-0', name: 'Oben-Links' },
+            { id: 1, rows: [0, 1], cols: [2, 3], color: 'region-1', name: 'Oben-Mitte' },
+            { id: 2, rows: [0, 1], cols: [4, 5], color: 'region-2', name: 'Oben-Rechts' },
+            // Zeile 2-3
+            { id: 3, rows: [2, 3], cols: [0, 1], color: 'region-3', name: 'Mitte-Links' },
+            { id: 4, rows: [2, 3], cols: [2, 3], color: 'region-4', name: 'Mitte-Mitte' },
+            { id: 5, rows: [2, 3], cols: [4, 5], color: 'region-5', name: 'Mitte-Rechts' },
+            // Zeile 4-5
+            { id: 6, rows: [4, 5], cols: [0, 1], color: 'region-6', name: 'Unten-Links' },
+            { id: 7, rows: [4, 5], cols: [2, 3], color: 'region-7', name: 'Unten-Mitte' },
+            { id: 8, rows: [4, 5], cols: [4, 5], color: 'region-8', name: 'Unten-Rechts' }
+        ];
+        
+        class GameClient {
+            constructor() {
+                this.gameId = null;
+                this.playerId = null;
+                this.playerColor = null;
+                this.currentGameState = null;
+                this.pollInterval = null;
+                this.showRegions = true;
+                this.lastChatUpdate = null;
+                this.unreadMessages = 0;
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.loadGames();
+            }
+            
+            initializeElements() {
+                this.gameBoard = document.getElementById('gameBoard');
+                this.statusDisplay = document.getElementById('status');
+                this.gameInfo = document.getElementById('gameInfo');
+                this.gamesList = document.getElementById('gamesList');
+                this.playerColorInfo = document.getElementById('playerColorInfo');
+                this.playerIdInfo = document.getElementById('playerIdInfo');
+                this.regionLegend = document.getElementById('regionLegend');
+                
+                this.createGameBtn = document.getElementById('createGameBtn');
+                this.refreshGamesBtn = document.getElementById('refreshGamesBtn');
+                this.autoJoinBtn = document.getElementById('autoJoinBtn');
+                //<!-- ergibt iwie keinen Sinn -->
+                //this.toggleRegionsBtn = document.getElementById('toggleRegionsBtn');
+                
+                // Chat-Elemente
+                this.chatMessages = document.getElementById('chatMessages');
+                this.chatInput = document.getElementById('chatInput');
+                this.sendButton = document.getElementById('sendButton');
+                this.newMessageIndicator = document.getElementById('newMessageIndicator');
+                this.chatTab = document.getElementById('chatTab');
+            }
+            
+            setupEventListeners() {
+                this.createGameBtn.addEventListener('click', () => this.createGame());
+                this.refreshGamesBtn.addEventListener('click', () => this.loadGames());
+                this.autoJoinBtn.addEventListener('click', () => this.autoJoinGame());
+                //<!-- ergibt iwie keinen Sinn -->
+                //this.toggleRegionsBtn.addEventListener('click', () => this.toggleRegions());
+                
+                // Chat-Event-Listener
+                this.sendButton.addEventListener('click', () => this.sendMessage());
+                this.chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        this.sendMessage();
+                    }
+                });
+                
+                // Chat-Tab Klick zum Markieren als gelesen
+                this.chatTab.addEventListener('click', () => this.markMessagesAsRead());
+            }
+            
+         /** ergibt iwie keinen Sinn
+            toggleRegions() {
+                this.showRegions = !this.showRegions;
+                const cells = document.querySelectorAll('.cell');
+                
+                cells.forEach(cell => {
+                    if (this.showRegions) {
+                        cell.style.opacity = '1';
+                    } else {
+                        cell.style.opacity = '0.7';
+                    }
+                });
+                
+                this.toggleRegionsBtn.textContent = 
+                    this.showRegions ? 'Regionen verstecken' : 'Regionen anzeigen';
+            }
+         */
+            
+            getRegionForCell(row, col) {
+                return REGIONS.find(region => 
+                    region.rows.includes(parseInt(row)) && 
+                    region.cols.includes(parseInt(col))
+                );
+            }
+            
+            renderBoard(gameState) {
+                this.currentGameState = gameState;
+                this.gameBoard.innerHTML = '';
+                
+                // Regionen-Status berechnen
+                const regionStatus = this.calculateRegionStatus(gameState.board);
+                
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.dataset.row = row;
+                        cell.dataset.col = col;
+                        
+                        // Region-Farbe zuweisen
+                        const region = this.getRegionForCell(row, col);
+                        if (region) {
+                            cell.classList.add(region.color);
+                            
+                            // Tooltip mit Regionsnamen hinzufügen
+                            cell.title = `Region: ${region.name}`;
+                        }
+                        
+                        // Prüfen ob Region komplett ist
+                        if (region && regionStatus[region.id].complete) {
+                            // Region komplett NICHT sichtbat machen
+                            //cell.classList.add('region-complete');
+                            cell.title += ` (Komplett: ${regionStatus[region.id].color})`;
+                        }
+                        
+                        const piece = gameState.board[row][col];
+                        if (piece) {
+                            const pieceElement = document.createElement('div');
+                            pieceElement.classList.add('piece', piece);
+                            cell.appendChild(pieceElement);
+                        }
+                        
+                        // Nur klickbar wenn Spieler am Zug ist
+                        if (gameState.status === 'playing' && 
+                            this.playerColor === gameState.currentPlayer) {
+                            cell.addEventListener('click', () => this.handleCellClick(row, col));
+                        }
+                        
+                        this.gameBoard.appendChild(cell);
+                    }
+                }
+                
+                // Regionen-Legende aktualisieren
+                this.updateRegionLegend(regionStatus);
+            }
+            
+            calculateRegionStatus(board) {
+                const regionStatus = {};
+                
+                REGIONS.forEach(region => {
+                    const cells = [];
+                    let whiteCount = 0;
+                    let blackCount = 0;
+                    
+                    region.rows.forEach(row => {
+                        region.cols.forEach(col => {
+                            const cellColor = board[row][col];
+                            cells.push(cellColor);
+                            if (cellColor === 'white') whiteCount++;
+                            if (cellColor === 'black') blackCount++;
+                        });
+                    });
+                    
+                    const complete = whiteCount === 4 || blackCount === 4;
+                    const dominantColor = whiteCount > blackCount ? 'white' : 
+                                         blackCount > whiteCount ? 'black' : null;
+                    
+                    regionStatus[region.id] = {
+                        complete: complete,
+                        color: dominantColor,
+                        whiteCount: whiteCount,
+                        blackCount: blackCount,
+                        emptyCount: 4 - whiteCount - blackCount
+                    };
+                });
+                
+                return regionStatus;
+            }
+            
+            updateRegionLegend(regionStatus) {
+                const legendItems = this.regionLegend.querySelectorAll('.legend-item');
+                
+                legendItems.forEach(item => {
+                    const regionId = Array.from(item.querySelector('.legend-color').classList)
+                        .find(cls => cls.startsWith('region-'))
+                        ?.split('-')[1];
+                    
+                    if (regionId !== undefined) {
+                        const status = regionStatus[regionId];
+                        const countElement = item.querySelector('.region-count') || 
+                                           document.createElement('span');
+                        
+                        if (!item.contains(countElement)) {
+                            countElement.className = 'region-count';
+                            item.appendChild(countElement);
+                        }
+                        
+                        countElement.textContent = ` (${status.whiteCount}W/${status.blackCount}S)`;
+                        countElement.style.fontSize = '10px';
+                        countElement.style.marginLeft = '2px';
+                        
+                        if (status.complete) {
+                            item.style.fontWeight = 'bold';
+                            item.style.color = status.color === 'white' ? '#333' : '#fff';
+                            item.style.backgroundColor = status.color === 'white' ? '#fff' : '#333';
+                            item.style.padding = '2px 5px';
+                            item.style.borderRadius = '3px';
+                        } else {
+                            item.style.fontWeight = 'normal';
+                            item.style.color = '';
+                            item.style.backgroundColor = '';
+                            item.style.padding = '0';
+                        }
+                    }
+                });
+            }
+            
+            // Chat-Methoden
+            async sendMessage() {
+                const message = this.chatInput.value.trim();
+                
+                if (!message) {
+                    return;
+                }
+                
+                if (!this.gameId || !this.playerId) {
+                    this.addSystemMessage('Du musst einem Spiel beigetreten sein, um chatten zu können.');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${API_BASE}/games/${this.gameId}/chat`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            playerId: this.playerId,
+                            message: message
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.chatInput.value = '';
+                        // Die Nachricht wird beim nächsten Polling automatisch erscheinen
+                    } else {
+                        this.addSystemMessage(`Fehler: ${data.error}`);
+                    }
+                } catch (error) {
+                    this.addSystemMessage('Verbindungsfehler beim Senden der Nachricht');
+                }
+            }
+            
+            async loadChatMessages() {
+                if (!this.gameId) return;
+                
+                try {
+                    const response = await fetch(`${API_BASE}/games/${this.gameId}/chat`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.updateChatDisplay(data.messages);
+                    }
+                } catch (error) {
+                    console.error('Fehler beim Laden der Chat-Nachrichten:', error);
+                }
+            }
+            
+            updateChatDisplay(messages) {
+                if (!messages || messages.length === 0) return;
+                
+                const lastMessage = messages[messages.length - 1];
+                const isScrolledToBottom = this.isChatScrolledToBottom();
+                
+                // Prüfe ob neue Nachrichten vorhanden sind
+                if (this.lastChatUpdate) {
+                    const newMessages = messages.filter(msg => 
+                        new Date(msg.timestamp) > this.lastChatUpdate
+                    );
+                    
+                    if (newMessages.length > 0 && !isScrolledToBottom) {
+                        this.unreadMessages += newMessages.length;
+                        this.updateMessageIndicator();
+                    }
+                }
+                
+                this.lastChatUpdate = new Date();
+                
+                // Aktualisiere die Anzeige
+                this.chatMessages.innerHTML = '';
+                
+                messages.forEach(message => {
+                    const messageElement = this.createMessageElement(message);
+                    this.chatMessages.appendChild(messageElement);
+                });
+                
+                // Scroll nach unten wenn vorher schon unten oder bei eigenen Nachrichten
+                if (isScrolledToBottom || lastMessage.playerId === this.playerId) {
+                    this.scrollChatToBottom();
+                }
+            }
+            
+            createMessageElement(message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'chat-message';
+                
+                const time = new Date(message.timestamp).toLocaleTimeString('de-DE', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                
+                if (message.playerId === 'system') {
+                    messageDiv.classList.add('system-message');
+                    messageDiv.innerHTML = `
+                        <div class="message-header">System</div>
+                        <div class="message-text">${this.escapeHtml(message.message)}</div>
+                    `;
+                } else {
+                    const isOwnMessage = message.playerId === this.playerId;
+                    const colorClass = `player-${message.playerColor}`;
+                    
+                    messageDiv.innerHTML = `
+                        <div class="message-header ${colorClass}">
+                            <span class="player-color"></span>
+                            <span class="player-name">${this.escapeHtml(message.playerName)}</span>
+                            <span class="message-time">${time}</span>
+                        </div>
+                        <div class="message-text">${this.escapeHtml(message.message)}</div>
+                    `;
+                    
+                    if (isOwnMessage) {
+                        messageDiv.style.background = '#e3f2fd';
+                    }
+                }
+                
+                return messageDiv;
+            }
+            
+            addSystemMessage(text) {
+                const systemMessage = {
+                    playerId: 'system',
+                    message: text,
+                    timestamp: new Date()
+                };
+                
+                const messageElement = this.createMessageElement(systemMessage);
+                this.chatMessages.appendChild(messageElement);
+                this.scrollChatToBottom();
+            }
+            
+            isChatScrolledToBottom() {
+                const tolerance = 10;
+                return this.chatMessages.scrollHeight - this.chatMessages.clientHeight <= this.chatMessages.scrollTop + tolerance;
+            }
+            
+            scrollChatToBottom() {
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+            
+            updateMessageIndicator() {
+                if (this.unreadMessages > 0) {
+                    this.newMessageIndicator.textContent = this.unreadMessages;
+                    this.newMessageIndicator.style.display = 'flex';
+                } else {
+                    this.newMessageIndicator.style.display = 'none';
+                }
+            }
+            
+            markMessagesAsRead() {
+                this.unreadMessages = 0;
+                this.updateMessageIndicator();
+                this.scrollChatToBottom();
+            }
+            
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+            
+            startChatPolling() {
+                if (this.chatPollInterval) {
+                    clearInterval(this.chatPollInterval);
+                }
+                
+                this.chatPollInterval = setInterval(async () => {
+                    if (this.gameId) {
+                        await this.loadChatMessages();
+                    }
+                }, 1000); // Chat alle Sekunde aktualisieren
+            }
+            
+            stopChatPolling() {
+                if (this.chatPollInterval) {
+                    clearInterval(this.chatPollInterval);
+                    this.chatPollInterval = null;
+                }
+            }
+                        
+            // ... restliche Methoden (createGame, joinGame, makeMove, etc.) bleiben gleich
+            // wie im vorherigen Code, aber mit der neuen renderBoard-Methode
+            
+            async createGame() {
+                try {
+                    const response = await fetch(`${API_BASE}/games`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.gameId = data.gameId;
+                        await this.joinGame(this.gameId);
+                    } else {
+                        this.showError('Fehler beim Erstellen des Spiels');
+                    }
+                } catch (error) {
+                    this.showError('Verbindungsfehler: ' + error.message);
+                }
+            }
+            
+            async joinGame(gameId) {
+                const playerName = document.getElementById('playerName').value || 'Spieler';
+                
+                try {
+                    const response = await fetch(`${API_BASE}/games/${gameId}/join`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ playerName })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.playerId = data.playerId;
+                        this.playerColor = data.color;
+                        this.gameId = gameId;
+                        
+                        this.updatePlayerInfo();
+                        this.startGamePolling();
+                        this.startChatPolling(); // Chat-Polling starten
+                        this.renderBoard(data.gameState);
+                        this.updateStatus(data.gameState);
+                        
+                        // Willkommensnachricht im Chat
+                        this.addSystemMessage(`Willkommen im Spiel! Du spielst als ${this.playerColor === 'white' ? 'Weiß' : 'Schwarz'}`);
+                        
+                        // Lade vorhandene Chat-Nachrichten
+                        await this.loadChatMessages();
+                    } else {
+                        this.showError('Beitritt fehlgeschlagen: ' + data.error);
+                    }
+                } catch (error) {
+                    this.showError('Verbindungsfehler: ' + error.message);
+                }
+            }
+            
+            async makeMove(row, col) {
+                try {
+                    const response = await fetch(`${API_BASE}/games/${this.gameId}/move`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            playerId: this.playerId,
+                            row: row,
+                            col: col
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.renderBoard(data.game);
+                        this.updateStatus(data.game);
+                        
+                        if (data.gameFinished) {
+                            if (this.pollInterval) {
+                                clearInterval(this.pollInterval);
+                                this.pollInterval = null;
+                            }
+                            
+                            if (data.winner === this.playerColor) {
+                                this.showVictoryMessage(data.winCondition);
+                            } else {
+                                this.showDefeatMessage(data.winner, data.winCondition);
+                            }
+                        }
+                    } else {
+                        this.showError('Zug fehlgeschlagen: ' + data.error);
+                    }
+                } catch (error) {
+                    this.showError('Verbindungsfehler: ' + error.message);
+                }
+            }
+            
+            handleCellClick(row, col) {
+                if (this.currentGameState.status === 'playing' && 
+                    this.playerColor === this.currentGameState.currentPlayer) {
+                    this.makeMove(row, col);
+                }
+            }
+            
+            updatePlayerInfo() {
+                const colorText = this.playerColor === 'white' ? 'Weiß' : 'Schwarz';
+                this.playerColorInfo.textContent = `Farbe: ${colorText}`;
+                this.playerIdInfo.textContent = `Spieler ID: ${this.playerId.slice(0, 8)}...`;
+            }
+            
+            startGamePolling() {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                }
+                
+                this.pollInterval = setInterval(async () => {
+                    if (this.gameId) {
+                        await this.updateGameState();
+                    }
+                }, 2000);
+            }
+            
+            async updateGameState() {
+                try {
+                    const response = await fetch(`${API_BASE}/games/${this.gameId}`);
+                    const data = await response.json();
+                    
+                    if (data.success && this.currentGameState) {
+                        if (JSON.stringify(data.game) !== JSON.stringify(this.currentGameState)) {
+                            this.renderBoard(data.game);
+                            this.updateStatus(data.game);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Fehler beim Aktualisieren des Spielzustands:', error);
+                }
+            }
+            
+            updateStatus(gameState) {
+                let statusText = '';
+                let statusClass = '';
+                
+                switch (gameState.status) {
+                    case 'waiting':
+                        statusText = 'Warte auf zweiten Spieler...';
+                        statusClass = 'waiting';
+                        break;
+                    case 'playing':
+                        const currentPlayerName = gameState.currentPlayer === 'white' ? 'Weiß' : 'Schwarz';
+                        statusText = `Spieler ${currentPlayerName} ist am Zug`;
+                        statusClass = 'playing';
+                        break;
+                    case 'finished':
+                        const winnerName = gameState.winner === 'white' ? 'Weiß' : 'Schwarz';
+                        const winConditionText = this.getWinConditionText(gameState.winCondition);
+                        statusText = `Spiel beendet! Gewinner: ${winnerName} (${winConditionText})`;
+                        statusClass = 'finished';
+                        break;
+                }
+                
+                this.statusDisplay.textContent = statusText;
+                this.statusDisplay.className = `status ${statusClass}`;
+                this.gameInfo.textContent = `Spiel: ${this.gameId} | Status: ${gameState.status}`;
+            }
+            
+            getWinConditionText(winCondition) {
+                const conditions = {
+                    //'4x4_rechteck': '4x4 Rechteck gebildet',        // GEÄNDERT
+                    //'3x3_rechteck': '3x3 Rechteck gebildet',        // GEÄNDERT
+                    '3x2_rechteck': '3x2 oder 2x3 Rechteck gebildet', // GEÄNDERT
+                    '5_in_reihe_horizontal': '5 Steine horizontal',
+                    '5_in_reihe_vertikal': '5 Steine vertikal',
+                    '5_in_reihe_diagonal_rechts': '5 Steine diagonal (↘)',
+                    '5_in_reihe_diagonal_links': '5 Steine diagonal (↙)',
+                    'region_abgedeckt': '2 Regionen abgedeckt'        // GEÄNDERT
+                };
+                
+                return conditions[winCondition] || 'Sieg erreicht';
+            }
+            
+            showVictoryMessage(winCondition) {
+                const winText = this.getWinConditionText(winCondition);
+                setTimeout(() => {
+                    alert(`🎉 Herzlichen Glückwunsch! Sie haben gewonnen!\nGrund: ${winText}`);
+                }, 500);
+            }
+            
+            showDefeatMessage(winner, winCondition) {
+                const winText = this.getWinConditionText(winCondition);
+                const winnerName = winner === 'white' ? 'Weiß' : 'Schwarz';
+                setTimeout(() => {
+                    alert(`😔 ${winnerName} hat gewonnen!\nGrund: ${winText}`);
+                }, 500);
+            }
+            
+            async loadGames() {
+                try {
+                    const response = await fetch(`${API_BASE}/games`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.renderGamesList(data.games);
+                    }
+                } catch (error) {
+                    console.error('Fehler beim Laden der Spiele:', error);
+                }
+            }
+            
+            renderGamesList(games) {
+                this.gamesList.innerHTML = '';
+                
+                if (games.length === 0) {
+                    this.gamesList.innerHTML = '<div>Keine aktiven Spiele gefunden</div>';
+                    return;
+                }
+                
+                games.forEach(game => {
+                    const gameItem = document.createElement('div');
+                    gameItem.classList.add('game-item');
+                    gameItem.dataset.gameId = game.id;
+                    gameItem.dataset.status = game.status;
+                    
+                    const playerCount = Object.values(game.players).filter(p => p !== null).length;
+                    const statusText = game.status === 'waiting' ? 'Wartend' : 'Laufend';
+                    
+                    gameItem.innerHTML = `
+                        <strong>Spiel ${game.id.slice(0, 8)}</strong><br>
+                        Spieler: ${playerCount}/2 | Status: ${statusText}
+                    `;
+                    
+                    gameItem.addEventListener('click', () => this.joinGame(game.id));
+                    
+                    this.gamesList.appendChild(gameItem);
+                });
+            }
+            
+            async autoJoinGame() {
+                await this.loadGames();
+                
+                const gameItems = this.gamesList.querySelectorAll('.game-item');
+                for (let gameItem of gameItems) {
+                    const gameId = gameItem.dataset.gameId;
+                    const gameStatus = gameItem.dataset.status;
+                    
+                    if (gameStatus === 'waiting') {
+                        await this.joinGame(gameId);
+                        return;
+                    }
+                }
+                
+                await this.createGame();
+            }
+            
+            showError(message) {
+                this.statusDisplay.textContent = `Fehler: ${message}`;
+                this.statusDisplay.style.backgroundColor = '#f8d7da';
+                this.statusDisplay.style.color = '#721c24';
+            }
+            
+            // Geänderte reset/leave Methoden
+            resetGame() {
+                this.stopChatPolling();
+                this.chatMessages.innerHTML = '<div class="chat-message system-message"><div class="message-header">System</div><div class="message-text">Willkommen! Der Chat ist bereit.</div></div>';
+                this.unreadMessages = 0;
+                this.updateMessageIndicator();
+                // ... restlicher Reset-Code
+            }
+        }
+        
+        // Spiel initialisieren
+        document.addEventListener('DOMContentLoaded', () => {
+            new GameClient();
+        });
+    </script>
+</body>
+</html>

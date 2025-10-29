@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>6x6 Brettspiel - Weiß vs Schwarz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .game-info {
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .board {
+            display: grid;
+            grid-template-columns: repeat(6, 60px);
+            grid-template-rows: repeat(6, 60px);
+            gap: 2px;
+            background-color: #8B4513;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .cell {
+            width: 60px;
+            height: 60px;
+            background-color: #DEB887;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        
+        .cell:hover {
+            background-color: #D2B48C;
+        }
+        
+        .piece {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+        }
+        
+        .white {
+            background-color: white;
+            border: 1px solid #ccc;
+        }
+        
+        .black {
+            background-color: black;
+            border: 1px solid #333;
+        }
+        
+        .controls {
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        .status {
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>6x6 Brettspiel</h1>
+    <div class="game-info">Weiß vs Schwarz</div>
+    <div class="board" id="gameBoard"></div>
+    <div class="status" id="status">Spieler Weiß ist am Zug</div>
+    <div class="controls">
+        <button id="resetButton">Spiel zurücksetzen</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const gameBoard = document.getElementById('gameBoard');
+            const statusDisplay = document.getElementById('status');
+            const resetButton = document.getElementById('resetButton');
+            
+            let currentPlayer = 'white'; // Weiß beginnt
+            let gameActive = true;
+            let boardState = Array(6).fill().map(() => Array(6).fill(null));
+            
+            // Spielfeld erstellen
+            function createBoard() {
+                gameBoard.innerHTML = '';
+                for (let row = 0; row < 6; row++) {
+                    for (let col = 0; col < 6; col++) {
+                        const cell = document.createElement('div');
+                        cell.classList.add('cell');
+                        cell.dataset.row = row;
+                        cell.dataset.col = col;
+                        
+                        cell.addEventListener('click', handleCellClick);
+                        
+                        gameBoard.appendChild(cell);
+                    }
+                }
+            }
+            
+            // Zellenklick verarbeiten
+            function handleCellClick(event) {
+                if (!gameActive) return;
+                
+                const row = parseInt(event.target.dataset.row);
+                const col = parseInt(event.target.dataset.col);
+                
+                // Prüfen, ob das Feld bereits belegt ist
+                if (boardState[row][col] !== null) {
+                    return;
+                }
+                
+                // Spielstein platzieren
+                placePiece(row, col);
+                
+                // Spieler wechseln
+                currentPlayer = currentPlayer === 'white' ? 'black' : 'white';
+                statusDisplay.textContent = `Spieler ${currentPlayer === 'white' ? 'Weiß' : 'Schwarz'} ist am Zug`;
+            }
+            
+            // Spielstein platzieren
+            function placePiece(row, col) {
+                boardState[row][col] = currentPlayer;
+                
+                const cell = document.querySelector(`.cell[data-row="${row}"][data-col="${col}"]`);
+                const piece = document.createElement('div');
+                piece.classList.add('piece', currentPlayer);
+                cell.appendChild(piece);
+            }
+            
+            // Spiel zurücksetzen
+            function resetGame() {
+                boardState = Array(6).fill().map(() => Array(6).fill(null));
+                currentPlayer = 'white';
+                gameActive = true;
+                statusDisplay.textContent = 'Spieler Weiß ist am Zug';
+                createBoard();
+            }
+            
+            resetButton.addEventListener('click', resetGame);
+            
+            // Initialisierung
+            createBoard();
+        });
+    </script>
+</body>
+</html>

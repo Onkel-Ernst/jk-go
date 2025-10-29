@@ -1,0 +1,43 @@
+Projekt in GitHub anlegen
+-------------------------
+
+https://github.com/login
+Onkel-Ernst
+GitJupp59
+
+New: jk-go
+
+=> Repository: https://github.com/Onkel-Ernst/jk-go.git
+klick link: uploading existing files
+dann: drag & drop
+
+
+Dann das Projekt auf onrender und meinem github-Projekt verknüpfen:
+
+
+git-Befehle - Beispiele (im Terminal)
+-------------------------------------
+create a new repository on the command line:
+echo "# jk-go" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/Onkel-Ernst/jk-go.git
+git push -u origin main
+
+…or 
+push an existing repository from the command line
+git remote add origin https://github.com/Onkel-Ernst/jk-go.git
+git branch -M main
+git push -u origin main
+
+weitere Beispiele:
+git status
+git diff [--staged]       OR  git diff public/index.html
+git add doc/_LIESMICH.txt
+git add public/index.html  OR  git add .
+git diff --staged
+git commit -m "changed message"
+git push
+
