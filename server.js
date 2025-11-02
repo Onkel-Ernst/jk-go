@@ -69,31 +69,33 @@ class Game {
         
         if (winCondition) {
             this.status = 'finished';
-            this.winner = this.currentPlayer;
-            this.winCondition = winCondition;
-            
-            return { 
-                success: true, 
-                game: this.getGameState(),
-                gameFinished: true,
-                winner: this.currentPlayer,
-                winCondition: winCondition
-            };
-        }
+            // Erweiterung "Größtes Gebiet"
+            // Spezielle Behandlung für größtes Gebiet
+            if (winCondition.startsWith('groesstes_gebiet_')) {
+                // winner wurde bereits in checkWinConditions gesetzt
+                const size = parseInt(winCondition.split('_')[2]);
 
-        // Unentschieden prüfen (wenn alle Felder belegt sind)
-        if (this.isBoardFull()) {
-            this.status = 'finished';
-            this.winner = 'draw';
-            this.winCondition = 'unentschieden';
-            
-            return { 
-                success: true, 
-                game: this.getGameState(),
-                gameFinished: true,
-                winner: 'draw',
-                winCondition: 'unentschieden'
-            };
+                return { 
+                    success: true, 
+                    game: this.getGameState(),
+                    gameFinished: true,
+                    winner: this.winner,
+                    winCondition: winCondition,
+                    largestAreaSize: size
+                };
+            } else {
+                // Normale Siegbedingung
+                this.winner = this.currentPlayer;
+                this.winCondition = winCondition;
+
+                return { 
+                    success: true, 
+                    game: this.getGameState(),
+                    gameFinished: true,
+                    winner: this.currentPlayer,
+                    winCondition: winCondition
+                };
+            }
         }
 
         // Spieler wechseln
@@ -132,6 +134,17 @@ class Game {
         // 3. Prüfe auf Regionen-Abdeckung (2x2 Blöcke)
         if (this.checkRegionCoverage(playerColor)) {
             return 'region_abgedeckt';
+        }
+    
+        // Erweiterung "Größtes Gebiet"
+        // 4. NEU: Prüfe ob Brett voll ist - dann gewinnt größtes Gebiet
+        if (this.isBoardFull()) {
+            const largestAreaResult = this.findLargestConnectedArea();
+            if (largestAreaResult.winner) {
+                this.winner = largestAreaResult.winner;
+                this.winCondition = `groesstes_gebiet_${largestAreaResult.size}`;
+                return this.winCondition;
+            }
         }
         
         return null;
@@ -195,6 +208,7 @@ class Game {
     }
 */
 
+    // 1. Prüfe auf 3x2 oder 2x3 Rechteck
     check3x2Or2x3Rectangle(playerColor) {
         const board = this.board;
     
@@ -247,6 +261,7 @@ class Game {
         return false;
     }
 
+    // 2. Prüfe auf 5 in einer Reihe
     checkFiveInRow(playerColor) {
         const board = this.board;
         // Richtungen: horizontal, vertikal, diagonal rechts, diagonal links
@@ -283,6 +298,7 @@ class Game {
         return { found: false };
     }
 
+    // 3. Prüfe auf Regionen-Abdeckung (2x2 Blöcke)
     checkRegionCoverage(playerColor) {
         const board = this.board;
         // Definiere Regionen als 2x2 Blöcke
@@ -334,6 +350,89 @@ class Game {
         return win;
     }
 
+    // Erweiterung "Größtes Gebiet"
+    // 4. Findet das größte zusammenhängende Gebiet
+    findLargestConnectedArea() {
+        const board = this.board;
+        const visited = Array(6).fill().map(() => Array(6).fill(false));
+        let whiteAreas = [];
+        let blackAreas = [];
+
+        // Durchlaufe alle Felder
+        for (let row = 0; row < 6; row++) {
+            for (let col = 0; col < 6; col++) {
+                if (!visited[row][col]) {
+                    const color = board[row][col];
+                    if (color) {
+                        const area = this.floodFill(row, col, color, visited, []);
+
+                        if (color === 'white') {
+                            whiteAreas.push(area);
+                        } else {
+                            blackAreas.push(area);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Finde größtes Gebiet für jede Farbe
+        const largestWhite = whiteAreas.length > 0 ? 
+            Math.max(...whiteAreas.map(area => area.size)) : 0;
+        const largestBlack = blackAreas.length > 0 ? 
+            Math.max(...blackAreas.map(area => area.size)) : 0;
+
+        console.log(`Größte Gebiete - Weiß: ${largestWhite}, Schwarz: ${largestBlack}`);
+    
+        // Bestimme Gewinner
+        if (largestWhite > largestBlack) {
+            return { winner: 'white', size: largestWhite };
+        } else if (largestBlack > largestWhite) {
+            return { winner: 'black', size: largestBlack };
+        } else {
+            // Unentschieden bei gleicher Größe
+            return { winner: 'draw', size: largestWhite };
+        }
+    }
+
+    // NEUE METHODE: Flood-Fill Algorithmus für zusammenhängende Gebiete
+    floodFill(startRow, startCol, targetColor, visited, currentArea) {
+        const directions = [
+            { dr: -1, dc: 0 },  // oben
+            { dr: 1, dc: 0 },   // unten
+            { dr: 0, dc: -1 },  // links
+            { dr: 0, dc: 1 }    // rechts
+        ];
+
+        const stack = [{ row: startRow, col: startCol }];
+        let size = 0;
+        const cells = [];
+    
+        while (stack.length > 0) {
+            const { row, col } = stack.pop();
+ 
+            // Prüfe Grenzen und ob bereits besucht
+            if (row < 0 || row >= 6 || col < 0 || col >= 6) continue;
+            if (visited[row][col]) continue;
+            if (this.board[row][col] !== targetColor) continue;
+
+            // Markiere als besucht und zähle
+            visited[row][col] = true;
+            size++;
+            cells.push({ row, col });
+
+            // Füge Nachbarfelder zum Stack hinzu
+            for (const dir of directions) {
+                stack.push({
+                    row: row + dir.dr,
+                    col: col + dir.dc
+                });
+            }
+        }
+
+        return { size, cells };
+    }
+
     isBoardFull() {
         for (let row = 0; row < 6; row++) {
             for (let col = 0; col < 6; col++) {
@@ -342,7 +441,7 @@ class Game {
                 }
             }
         }
-        console.log('Unentschieden - alle Felder sind belegt');
+        console.log('Brett komplett gefüllt - prüfe größtes Gebiet...');
         return true;
     }
 

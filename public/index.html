@@ -16,6 +16,13 @@
             background-color: #f0f0f0;
             padding: 20px;
         }
+
+        .version {
+            position: absolute;
+            font-size: 12px;
+            top: 10px;
+            right: 10px;
+        }
         
         .container {
             display: flex;
@@ -38,6 +45,7 @@
         
         h1 {
             color: #333;
+            margin-top: 0px;
             margin-bottom: 10px;
             text-align: center;
         }
@@ -185,6 +193,11 @@
             color: #0c5460;
         }
         
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        
         .player-info {
             margin-bottom: 15px;
             padding: 10px;
@@ -277,7 +290,22 @@
             z-index: 3;
         }
 
-        /* CSS-Stile für Chat: */
+     /* Erweiterung "Größtes Gebiet": Markiere Größtes Gebiet, wenn Spielbrett komplett gefüllt */
+        .connected-area {
+            animation: area-pulse 2s infinite;
+        }
+
+        @keyframes area-pulse {
+            0% { box-shadow: 0 0 0px rgba(255, 215, 0, 0.5); }
+            50% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.8); }
+            100% { box-shadow: 0 0 0px rgba(255, 215, 0, 0.5); }
+        }
+
+        .winning-area {
+            border: 3px solid gold;
+        }
+
+     /* CSS-Stile für Chat: */
         .chat-container {
             margin-top: 20px;
             background: white;
@@ -402,7 +430,7 @@
         .new-message-indicator {
             position: absolute;
             top: -5px;
-            right: -5px;
+            right: -30px;
             background: #ff4444;
             color: white;
             border-radius: 50%;
@@ -422,6 +450,8 @@
 </head>
 
 <body>
+    <div class="version">v1.0</div>
+
     <h1>jk-go - 6x6 Brettspiel + Chat</h1>
     
     <div class="container">
@@ -451,6 +481,7 @@
             <!-- Chat-Container -->
             <div class="chat-container">
                 <div class="chat-header">
+                    <button class="test-button" id="testButton" style="display: none;">ToggleIndicator</button>
                     <span class="chat-tab" id="chatTab">
                         Spiel-Chat 
                         <span class="new-message-indicator" id="newMessageIndicator" style="display: none;">!</span>
@@ -551,6 +582,7 @@
                 this.chatMessages = document.getElementById('chatMessages');
                 this.chatInput = document.getElementById('chatInput');
                 this.sendButton = document.getElementById('sendButton');
+                this.testButton = document.getElementById('testButton');
                 this.newMessageIndicator = document.getElementById('newMessageIndicator');
                 this.chatTab = document.getElementById('chatTab');
             }
@@ -564,6 +596,8 @@
                 
                 // Chat-Event-Listener
                 this.sendButton.addEventListener('click', () => this.sendMessage());
+                this.testButton.addEventListener('click', () => this.toggleMessageIndicator());
+                //this.chatInput.addEventListener('click', () => this.toggleMessageIndicator());
                 this.chatInput.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') {
                         this.sendMessage();
@@ -866,8 +900,18 @@
             }
             
             updateMessageIndicator() {
+                console.log(`updateMessageIndicator!`);
                 if (this.unreadMessages > 0) {
                     this.newMessageIndicator.textContent = this.unreadMessages;
+                    this.newMessageIndicator.style.display = 'flex';
+                } else {
+                    this.newMessageIndicator.style.display = 'none';
+                }
+            }
+            
+            toggleMessageIndicator() {
+                console.log(`toggleMessageIndicator!`);
+                if (this.newMessageIndicator.style.display === 'none') {
                     this.newMessageIndicator.style.display = 'flex';
                 } else {
                     this.newMessageIndicator.style.display = 'none';
@@ -993,11 +1037,25 @@
                                 clearInterval(this.pollInterval);
                                 this.pollInterval = null;
                             }
-                            
-                            if (data.winner === this.playerColor) {
-                                this.showVictoryMessage(data.winCondition);
+                            // Erweiterung "Größtes Gebiet"
+                            // Spezielle Nachricht für größtes Gebiet
+                            if (data.winCondition && data.winCondition.startsWith('groesstes_gebiet_')) {
+                                const size = data.largestAreaSize || data.winCondition.split('_')[2];
+                                if (data.winner === this.playerColor) {
+                                    this.showVictoryMessage(`Größtes Gebiet (${size} Felder)`);
+                                } else if (data.winner === 'draw') {
+                                    this.showDrawMessage(size);
+                                } else {
+                                    this.showDefeatMessage(data.winner, `Größtes Gebiet (${size} Felder)`);
+                                }
                             } else {
-                                this.showDefeatMessage(data.winner, data.winCondition);
+                                if (data.winner === this.playerColor) {
+                                    this.showVictoryMessage(data.winCondition);
+                                } else if (data.winner === 'draw') {
+                                    this.showDrawMessage();
+                                } else {
+                                    this.showDefeatMessage(data.winner, data.winCondition);
+                                }
                             }
                         }
                     } else {
@@ -1063,11 +1121,25 @@
                         statusText = `Spieler ${currentPlayerName} ist am Zug`;
                         statusClass = 'playing';
                         break;
+                    // Erweiterung "Größtes Gebiet"
                     case 'finished':
-                        const winnerName = gameState.winner === 'white' ? 'Weiß' : 'Schwarz';
-                        const winConditionText = this.getWinConditionText(gameState.winCondition);
-                        statusText = `Spiel beendet! Gewinner: ${winnerName} (${winConditionText})`;
-                        statusClass = 'finished';
+                        /*
+                        console.log(`updateStatus:` +
+                                    `\ngameState.status:        ` + gameState.status +
+                                    `\ngameState.winner:        ` + gameState.winner +
+                                    `\ngameState.currentPlayer: ` + gameState.currentPlayer +
+                                    `\ngameState.winCondition:  ` + gameState.winCondition);
+                        */
+                        if (gameState.winner === 'draw') {
+                            const size = gameState.winCondition.split('_')[2];
+                            statusText = `Spiel beendet! Unentschieden - größtes Gebiet: ${size} Felder`;
+                            statusClass = 'finished';
+                        } else {
+                            const winnerName = gameState.winner === 'white' ? 'Weiß' : 'Schwarz';
+                            const winConditionText = this.getWinConditionText(gameState.winCondition);
+                            statusText = `Spiel beendet! Gewinner: ${winnerName} (${winConditionText})`;
+                            statusClass = 'finished';
+                        }
                         break;
                 }
                 
@@ -1085,10 +1157,20 @@
                     '5_in_reihe_vertikal': '5 Steine vertikal',
                     '5_in_reihe_diagonal_rechts': '5 Steine diagonal (↘)',
                     '5_in_reihe_diagonal_links': '5 Steine diagonal (↙)',
-                    'region_abgedeckt': '2 Regionen abgedeckt'        // GEÄNDERT
+                    'region_abgedeckt': '2 Regionen abgedeckt',       // GEÄNDERT
+                    // Erweiterung "Größtes Gebiet"
+                    // End-Bedingung, wenn Spielbrett komplett gefüllt
+                    'unentschieden': 'Unentschieden'
                 };
-                
-                return conditions[winCondition] || 'Sieg erreicht';
+    
+                // Erweiterung "Größtes Gebiet"
+                // Spezielle Behandlung für größtes Gebiet
+                if (winCondition && winCondition.startsWith('groesstes_gebiet_')) {
+                    const size = winCondition.split('_')[2];
+                    return `Größtes zusammenhängendes Gebiet (${size} Felder)`;
+                }
+
+                return conditions[winCondition] || 'Größtes Gebiet';
             }
             
             showVictoryMessage(winCondition) {
@@ -1105,7 +1187,19 @@
                     alert(`😔 ${winnerName} hat gewonnen!\nGrund: ${winText}`);
                 }, 500);
             }
-            
+
+            // Erweiterung "Größtes Gebiet"
+            // Neue Methode für Unentschieden
+            showDrawMessage(areaSize = null) {
+                let message = 'Unentschieden! Das Spiel endet ohne klaren Sieger.';
+                if (areaSize) {
+                    message = `Unentschieden! Beide haben gleich große Gebiete (${areaSize} Felder).`;
+                }
+                setTimeout(() => {
+                    alert(`🤝 ${message}`);
+                }, 500);
+            }
+
             async loadGames() {
                 try {
                     const response = await fetch(`${API_BASE}/games`);
@@ -1166,8 +1260,7 @@
             
             showError(message) {
                 this.statusDisplay.textContent = `Fehler: ${message}`;
-                this.statusDisplay.style.backgroundColor = '#f8d7da';
-                this.statusDisplay.style.color = '#721c24';
+                this.statusDisplay.className = `status error`;
             }
             
             // Geänderte reset/leave Methoden
