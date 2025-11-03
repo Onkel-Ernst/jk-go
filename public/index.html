@@ -305,6 +305,23 @@
             border: 3px solid gold;
         }
 
+     /* singleplayer: KI-Status Anzeige */
+        .ki-thinking {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb) !important;
+            border-left: 4px solid #2196f3 !important;
+        }
+
+        .computer-move {
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        /* Deaktiviertes Brett */
+        .board-disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
      /* CSS-Stile für Chat: */
         .chat-container {
             margin-top: 20px;
@@ -450,9 +467,9 @@
 </head>
 
 <body>
-    <div class="version">v1.0</div>
+    <div class="version">v2.0</div>
 
-    <h1>jk-go - 6x6 Brettspiel + Chat</h1>
+    <h1>jk-go - 6x6 Brettspiel - Multi/Single-Player + Chat</h1>
     
     <div class="container">
         <div class="game-section">
@@ -460,7 +477,20 @@
             <div class="board" id="gameBoard"></div>
             <div class="status" id="status">Bitte erstelle oder betrete ein Spiel</div>
             <div class="controls">
-                <button id="createGameBtn" class="btn-primary">Neues Spiel erstellen</button>
+                <button id="createGameBtn" class="btn-primary">Neues Mehrspieler-Spiel</button>
+            <!-- singleplayer Button -->
+                <button id="singleplayerBtn" class="btn-primary">Gegen KI spielen</button>
+
+            <!-- singleplayer Gegner Modus -->
+                <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
+                    <label for="difficultySelect">KI-Schwierigkeit:</label>
+                    <select id="difficultySelect" style="padding: 5px; border-radius: 4px;">
+                        <option value="easy">Einfach</option>
+                        <option value="medium" selected>Mittel</option>
+                        <option value="hard">Schwierig</option>
+                    </select>
+                </div>
+
                 <button id="refreshGamesBtn" class="btn-secondary">Spiele aktualisieren</button>
                 <!-- ergibt iwie keinen Sinn -->
                 <!-- <button id="toggleRegionsBtn" class="btn-secondary">Regionen anzeigen/verstecken</button> -->
@@ -557,6 +587,9 @@
                 this.showRegions = true;
                 this.lastChatUpdate = null;
                 this.unreadMessages = 0;
+            // singleplayer
+                this.gameMode = 'multiplayer'; // 'multiplayer' oder 'singleplayer'
+                this.computerDifficulty = 'medium';
                 
                 this.initializeElements();
                 this.setupEventListeners();
@@ -571,6 +604,9 @@
                 this.playerColorInfo = document.getElementById('playerColorInfo');
                 this.playerIdInfo = document.getElementById('playerIdInfo');
                 this.regionLegend = document.getElementById('regionLegend');
+            // singleplayer
+                this.singleplayerBtn = document.getElementById('singleplayerBtn');
+                this.difficultySelect = document.getElementById('difficultySelect');
                 
                 this.createGameBtn = document.getElementById('createGameBtn');
                 this.refreshGamesBtn = document.getElementById('refreshGamesBtn');
@@ -593,6 +629,8 @@
                 this.autoJoinBtn.addEventListener('click', () => this.autoJoinGame());
                 //<!-- ergibt iwie keinen Sinn -->
                 //this.toggleRegionsBtn.addEventListener('click', () => this.toggleRegions());
+            // singleplayer
+                this.singleplayerBtn.addEventListener('click', () => this.createSinglePlayerGame());
                 
                 // Chat-Event-Listener
                 this.sendButton.addEventListener('click', () => this.sendMessage());
@@ -634,6 +672,12 @@
             }
             
             renderBoard(gameState) {
+                console.log('renderBoard:', {
+                    status: gameState.status,
+                    currentPlayer: gameState.currentPlayer,
+                    winCondition: gameState.winCondition
+                });
+
                 this.currentGameState = gameState;
                 this.gameBoard.innerHTML = '';
                 
@@ -754,6 +798,184 @@
                     }
                 });
             }
+
+
+            // singleplayer: Einzelspieler-Spiel erstellen
+            // Vereinfachte Client-Methode für Einzelspieler:
+            async createSinglePlayerGame() {
+                const difficulty = this.difficultySelect ? this.difficultySelect.value : 'medium';
+                const playerName = document.getElementById('playerName').value || 'Spieler';
+        
+                try {
+                    const response = await fetch(`${API_BASE}/games/singleplayer`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        // Korrektur:
+                        //body: JSON.stringify({ difficulty })
+                        body: JSON.stringify({ 
+                            playerName,
+                            difficulty 
+                        })
+                    });
+            
+                    const data = await response.json();
+/* Korrektur            
+                    if (data.success) {
+                        this.gameMode = 'singleplayer';
+                        this.computerDifficulty = difficulty;
+                        this.gameId = data.gameId;
+                        await this.joinSinglePlayerGame(this.gameId, playerName);
+                    } else {
+                        this.showError('Fehler beim Erstellen des Einzelspieler-Spiels');
+                    }
+*/
+                    if (data.success) {
+                        this.gameMode = 'singleplayer';
+                        this.computerDifficulty = difficulty;
+                        this.gameId = data.gameId;
+                        this.playerId = data.playerId;
+                        this.playerColor = data.color;
+            
+                        this.updatePlayerInfo();
+                        this.startGamePolling();
+                        this.startChatPolling();
+                        this.renderBoard(data.gameState);
+                        this.updateStatus(data.gameState);
+            
+                        this.addSystemMessage(`Einzelspieler-Modus gestartet! Schwierigkeit: ${this.computerDifficulty}`);
+                        this.addSystemMessage(`Du spielst als ${this.playerColor === 'white' ? 'Weiß' : 'Schwarz'} gegen die KI`);
+            
+                        // DEBUG: Konsolenausgabe
+                        console.log('Spielstatus nach Erstellung:', data.gameState.status);
+                        console.log('Aktueller Spieler:', data.gameState.currentPlayer);
+            
+                        // Wenn KI beginnt, sofort KI-Zug anfordern
+                        if (data.gameState.currentPlayer !== this.playerColor) {
+                            console.log('KI beginnt, fordere KI-Zug an...');
+                            setTimeout(() => this.makeComputerMove(), 1000);
+                        } else {
+                            console.log('Spieler beginnt, warte auf Eingabe...');
+                        }
+            
+                    } else {
+                        this.showError('Fehler beim Erstellen des Einzelspieler-Spiels: ' + (data.error || 'Unbekannter Fehler'));
+                    }
+                } catch (error) {
+                    this.showError('Verbindungsfehler: ' + error.message);
+                }
+            }
+
+/* Koorektur: obsolet
+            // singleplayer: Einzelspieler-Spiel beitreten
+            async joinSinglePlayerGame(gameId, playerName) {
+                try {
+                    const response = await fetch(`${API_BASE}/games/${gameId}/join`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 
+                            playerName,
+                            isSinglePlayer: true 
+                        })
+                    });
+            
+                    const data = await response.json();
+            
+                    if (data.success) {
+                        this.playerId = data.playerId;
+                        this.playerColor = data.color;
+                        this.gameId = gameId;
+                        this.gameMode = 'singleplayer';
+                
+                        this.updatePlayerInfo();
+                        this.startGamePolling();
+                        this.startChatPolling();
+
+                        // Einzelspieler darf nicht warten
+                        data.gameState = 'playing';
+
+                        this.renderBoard(data.gameState);
+                        this.updateStatus(data.gameState);
+                
+                        this.addSystemMessage(`Einzelspieler-Modus gestartet! Schwierigkeit: ${this.computerDifficulty}`);
+                        this.addSystemMessage(`Du spielst als ${this.playerColor === 'white' ? 'Weiß' : 'Schwarz'} gegen die KI`);
+                
+                        // Wenn KI beginnt, sofort KI-Zug anfordern
+                        if (data.gameState.currentPlayer !== this.playerColor) {
+                            this.makeComputerMove();
+                        }
+                
+                    } else {
+                        this.showError('Beitritt fehlgeschlagen: ' + data.error);
+                    }
+                } catch (error) {
+                    this.showError('Verbindungsfehler: ' + error.message);
+                }
+            }
+*/
+
+            // singleplayer: KI-Zug anfordern
+            async makeComputerMove() {
+                if (this.gameMode !== 'singleplayer' || !this.gameId) return;
+        
+                try {
+                    // Deaktiviere das Brett während KI denkt
+                    this.disableBoard();
+                    this.addSystemMessage('KI denkt nach...', true);
+            
+                    const response = await fetch(`${API_BASE}/games/${this.gameId}/computer/move`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+            
+                    const data = await response.json();
+            
+                    if (data.success) {
+                        this.enableBoard();
+                
+                        if (data.gameFinished) {
+                            this.handleGameFinished(data);
+                        } else {
+                            this.renderBoard(data.game);
+                            this.updateStatus(data.game);
+                            const computerMove = '' + data.row + ',' + data.col;
+                         // this.addSystemMessage(`KI hat gesetzt auf (${data.isComputerMove ? '?' : 'unbekannt'})`, true);
+                            this.addSystemMessage(`KI hat gesetzt auf (${data.isComputerMove ? computerMove : 'unbekannt'})`, true);
+                        }
+                    } else {
+                        this.enableBoard();
+                        this.showError('KI-Zug fehlgeschlagen: ' + data.error);
+                    }
+                } catch (error) {
+                    this.enableBoard();
+                    this.showError('Verbindungsfehler bei KI-Zug: ' + error.message);
+                }
+            }
+
+            // singleplayer: Brett deaktivieren
+            disableBoard() {
+                const cells = document.querySelectorAll('.cell');
+                cells.forEach(cell => {
+                    cell.style.pointerEvents = 'none';
+                    cell.style.opacity = '0.6';
+                });
+                this.statusDisplay.textContent = 'KI denkt nach...';
+            }
+
+            // singleplayer: Brett aktivieren
+            enableBoard() {
+                const cells = document.querySelectorAll('.cell');
+                cells.forEach(cell => {
+                    cell.style.pointerEvents = 'auto';
+                    cell.style.opacity = '1';
+                });
+            }
+
             
             // Chat-Methoden
             async sendMessage() {
@@ -1012,6 +1234,7 @@
                 }
             }
             
+            // singleplayer: Geänderte makeMove Methode
             async makeMove(row, col) {
                 try {
                     const response = await fetch(`${API_BASE}/games/${this.gameId}/move`, {
@@ -1029,34 +1252,17 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        this.renderBoard(data.game);
+                        // Render Board mit eventuellen Gewinner-Zellen
+                        if (data.winCondition && data.winCondition.startsWith('groesstes_gebiet_')) {
+                            this.renderBoard(data.game, data.winningCells || [], data.opponentCells || []);
+                        } else {
+                            this.renderBoard(data.game);
+                        }
+                
                         this.updateStatus(data.game);
                         
                         if (data.gameFinished) {
-                            if (this.pollInterval) {
-                                clearInterval(this.pollInterval);
-                                this.pollInterval = null;
-                            }
-                            // Erweiterung "Größtes Gebiet"
-                            // Spezielle Nachricht für größtes Gebiet
-                            if (data.winCondition && data.winCondition.startsWith('groesstes_gebiet_')) {
-                                const size = data.largestAreaSize || data.winCondition.split('_')[2];
-                                if (data.winner === this.playerColor) {
-                                    this.showVictoryMessage(`Größtes Gebiet (${size} Felder)`);
-                                } else if (data.winner === 'draw') {
-                                    this.showDrawMessage(size);
-                                } else {
-                                    this.showDefeatMessage(data.winner, `Größtes Gebiet (${size} Felder)`);
-                                }
-                            } else {
-                                if (data.winner === this.playerColor) {
-                                    this.showVictoryMessage(data.winCondition);
-                                } else if (data.winner === 'draw') {
-                                    this.showDrawMessage();
-                                } else {
-                                    this.showDefeatMessage(data.winner, data.winCondition);
-                                }
-                            }
+                            this.handleGameFinished(data);
                         }
                     } else {
                         this.showError('Zug fehlgeschlagen: ' + data.error);
@@ -1065,13 +1271,71 @@
                     this.showError('Verbindungsfehler: ' + error.message);
                 }
             }
-            
-            handleCellClick(row, col) {
-                if (this.currentGameState.status === 'playing' && 
-                    this.playerColor === this.currentGameState.currentPlayer) {
-                    this.makeMove(row, col);
+
+            // singleplayer: Spielende behandeln
+            handleGameFinished(data) {
+                if (this.pollInterval) {
+                    clearInterval(this.pollInterval);
+                    this.pollInterval = null;
+                }
+
+                const isComputerWinner = data.winner && data.winner !== this.playerColor && data.winner !== 'draw';
+
+                // Erweiterung "Größtes Gebiet"
+                // Spezielle Nachricht für größtes Gebiet
+                if (data.winCondition && data.winCondition.startsWith('groesstes_gebiet_')) {
+                    const size = data.largestAreaSize || data.winCondition.split('_')[2];
+                    if (data.winner === this.playerColor) {
+                        this.showVictoryMessage(`Größtes Gebiet (${size} Felder)`);
+                    } else if (data.winner === 'draw') {
+                        this.showDrawMessage(size);
+                    } else {
+                        const winnerName = this.gameMode === 'singleplayer' ? 'KI' : (data.winner === 'white' ? 'Weiß' : 'Schwarz');
+                        this.showDefeatMessage(data.winner, `Größtes Gebiet (${size} Felder)`);
+                    }
+                } else {
+                    if (data.winner === this.playerColor) {
+                        this.showVictoryMessage(data.winCondition);
+                    } else if (data.winner === 'draw') {
+                        this.showDrawMessage();
+                    } else {
+                        const winnerName = this.gameMode === 'singleplayer' ? 'KI' : (data.winner === 'white' ? 'Weiß' : 'Schwarz');
+                        this.showDefeatMessage(data.winner, data.winCondition);
+                    }
                 }
             }
+
+           
+            // singleplayer: Geänderte handleCellClick für Einzelspieler
+            handleCellClick(row, col) {
+                console.log('handleCellClick:', {
+                    row: row, col: col,
+                    status: this.currentGameState.status,
+                    currentPlayer: this.currentGameState.currentPlayer,
+                    gameMode: this.gameMode
+                });
+
+                if (this.currentGameState.status === 'playing') {
+                    if (this.gameMode === 'singleplayer') {
+                        // Im Einzelspieler-Modus nur eigene Züge erlauben
+                        if (this.playerColor === this.currentGameState.currentPlayer) {
+                            this.makeMove(row, col).then(() => {
+                                // Nach menschlichem Zug, KI-Zug anfordern wenn Spiel noch läuft
+                                if (this.currentGameState.status === 'playing' && 
+                                    this.currentGameState.currentPlayer !== this.playerColor) {
+                                    setTimeout(() => this.makeComputerMove(), 1000);
+                                }
+                            });
+                        }
+                    } else {
+                        // Multiplayer-Modus (bestehende Logik)
+                        if (this.playerColor === this.currentGameState.currentPlayer) {
+                            this.makeMove(row, col);
+                        }
+                    }
+                }
+            }
+
             
             updatePlayerInfo() {
                 const colorText = this.playerColor === 'white' ? 'Weiß' : 'Schwarz';
@@ -1108,28 +1372,40 @@
             }
             
             updateStatus(gameState) {
+                console.log('updateStatus:', {
+                    status: gameState.status,
+                    currentPlayer: gameState.currentPlayer,
+                    gameMode: this.gameMode,
+                    difficulty: this.computerDifficulty
+                });
+    
                 let statusText = '';
                 let statusClass = '';
-                
+
                 switch (gameState.status) {
                     case 'waiting':
                         statusText = 'Warte auf zweiten Spieler...';
                         statusClass = 'waiting';
                         break;
                     case 'playing':
+                /* Korrektur
                         const currentPlayerName = gameState.currentPlayer === 'white' ? 'Weiß' : 'Schwarz';
                         statusText = `Spieler ${currentPlayerName} ist am Zug`;
+                */
+                        if (this.gameMode === 'singleplayer') {
+                            if (gameState.currentPlayer === this.playerColor) {
+                                statusText = 'Dein Zug!';
+                            } else {
+                                statusText = 'KI denkt nach...';
+                            }
+                        } else {
+                            const currentPlayerName = gameState.currentPlayer === 'white' ? 'Weiß' : 'Schwarz';
+                            statusText = `Spieler ${currentPlayerName} ist am Zug`;
+                        }
                         statusClass = 'playing';
                         break;
                     // Erweiterung "Größtes Gebiet"
                     case 'finished':
-                        /*
-                        console.log(`updateStatus:` +
-                                    `\ngameState.status:        ` + gameState.status +
-                                    `\ngameState.winner:        ` + gameState.winner +
-                                    `\ngameState.currentPlayer: ` + gameState.currentPlayer +
-                                    `\ngameState.winCondition:  ` + gameState.winCondition);
-                        */
                         if (gameState.winner === 'draw') {
                             const size = gameState.winCondition.split('_')[2];
                             statusText = `Spiel beendet! Unentschieden - größtes Gebiet: ${size} Felder`;
@@ -1145,7 +1421,7 @@
                 
                 this.statusDisplay.textContent = statusText;
                 this.statusDisplay.className = `status ${statusClass}`;
-                this.gameInfo.textContent = `Spiel: ${this.gameId} | Status: ${gameState.status}`;
+                this.gameInfo.textContent = `Spiel: ${this.gameId} | Status: ${gameState.status} | Modus: ${this.gameMode}`;
             }
             
             getWinConditionText(winCondition) {
@@ -1176,7 +1452,7 @@
             showVictoryMessage(winCondition) {
                 const winText = this.getWinConditionText(winCondition);
                 setTimeout(() => {
-                    alert(`🎉 Herzlichen Glückwunsch! Sie haben gewonnen!\nGrund: ${winText}`);
+                    alert(`🎉 Herzlichen Glückwunsch! Du hast gewonnen!\nGrund: ${winText}`);
                 }, 500);
             }
             
@@ -1246,6 +1522,7 @@
                 
                 const gameItems = this.gamesList.querySelectorAll('.game-item');
                 for (let gameItem of gameItems) {
+
                     const gameId = gameItem.dataset.gameId;
                     const gameStatus = gameItem.dataset.status;
                     
@@ -1271,7 +1548,8 @@
                 this.updateMessageIndicator();
                 // ... restlicher Reset-Code
             }
-        }
+        }   // ENDE class GameClient
+
         
         // Spiel initialisieren
         document.addEventListener('DOMContentLoaded', () => {

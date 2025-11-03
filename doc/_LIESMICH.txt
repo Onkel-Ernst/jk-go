@@ -40,4 +40,4 @@ git add public/index.html  OR  git add .
 git diff --staged
 git commit -m "changed message"
 git push
-
+git push -u origin main
