@@ -467,7 +467,7 @@
 </head>
 
 <body>
-    <div class="version">v2.0</div>
+    <div class="version">v2.01</div>
 
     <h1>jk-go - 6x6 Brettspiel - Multi/Single-Player + Chat</h1>
     
@@ -479,7 +479,7 @@
             <div class="controls">
                 <button id="createGameBtn" class="btn-primary">Neues Mehrspieler-Spiel</button>
             <!-- singleplayer Button -->
-                <button id="singleplayerBtn" class="btn-primary">Gegen KI spielen</button>
+                <button id="singleplayerBtn" class="btn-primary">Gegen KaI spielen</button>
 
             <!-- singleplayer Gegner Modus -->
                 <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
@@ -845,7 +845,7 @@
                         this.updateStatus(data.gameState);
             
                         this.addSystemMessage(`Einzelspieler-Modus gestartet! Schwierigkeit: ${this.computerDifficulty}`);
-                        this.addSystemMessage(`Du spielst als ${this.playerColor === 'white' ? 'Weiß' : 'Schwarz'} gegen die KI`);
+                        this.addSystemMessage(`Du spielst als ${this.playerColor === 'white' ? 'Weiß' : 'Schwarz'} gegen KaI`);
             
                         // DEBUG: Konsolenausgabe
                         console.log('Spielstatus nach Erstellung:', data.gameState.status);
@@ -901,7 +901,7 @@
                         this.updateStatus(data.gameState);
                 
                         this.addSystemMessage(`Einzelspieler-Modus gestartet! Schwierigkeit: ${this.computerDifficulty}`);
-                        this.addSystemMessage(`Du spielst als ${this.playerColor === 'white' ? 'Weiß' : 'Schwarz'} gegen die KI`);
+                        this.addSystemMessage(`Du spielst als ${this.playerColor === 'white' ? 'Weiß' : 'Schwarz'} gegen KaI`);
                 
                         // Wenn KI beginnt, sofort KI-Zug anfordern
                         if (data.gameState.currentPlayer !== this.playerColor) {
@@ -924,7 +924,7 @@
                 try {
                     // Deaktiviere das Brett während KI denkt
                     this.disableBoard();
-                    this.addSystemMessage('KI denkt nach...', true);
+                    this.addSystemMessage('KaI denkt nach...', true);
             
                     const response = await fetch(`${API_BASE}/games/${this.gameId}/computer/move`, {
                         method: 'POST',
@@ -937,15 +937,13 @@
             
                     if (data.success) {
                         this.enableBoard();
+                        this.renderBoard(data.game);
+                        this.updateStatus(data.game);
+                        const computerMove = '' + data.row + ',' + data.col;
+                        this.addSystemMessage(`KaI hat gesetzt auf (${data.isComputerMove ? computerMove : 'unbekannt'})`, true);
                 
                         if (data.gameFinished) {
                             this.handleGameFinished(data);
-                        } else {
-                            this.renderBoard(data.game);
-                            this.updateStatus(data.game);
-                            const computerMove = '' + data.row + ',' + data.col;
-                         // this.addSystemMessage(`KI hat gesetzt auf (${data.isComputerMove ? '?' : 'unbekannt'})`, true);
-                            this.addSystemMessage(`KI hat gesetzt auf (${data.isComputerMove ? computerMove : 'unbekannt'})`, true);
                         }
                     } else {
                         this.enableBoard();
@@ -964,7 +962,7 @@
                     cell.style.pointerEvents = 'none';
                     cell.style.opacity = '0.6';
                 });
-                this.statusDisplay.textContent = 'KI denkt nach...';
+                this.statusDisplay.textContent = 'KaI denkt nach...';
             }
 
             // singleplayer: Brett aktivieren
@@ -1290,7 +1288,7 @@
                     } else if (data.winner === 'draw') {
                         this.showDrawMessage(size);
                     } else {
-                        const winnerName = this.gameMode === 'singleplayer' ? 'KI' : (data.winner === 'white' ? 'Weiß' : 'Schwarz');
+                        const winnerName = this.gameMode === 'singleplayer' ? 'KaI' : (data.winner === 'white' ? 'Weiß' : 'Schwarz');
                         this.showDefeatMessage(data.winner, `Größtes Gebiet (${size} Felder)`);
                     }
                 } else {
@@ -1299,7 +1297,7 @@
                     } else if (data.winner === 'draw') {
                         this.showDrawMessage();
                     } else {
-                        const winnerName = this.gameMode === 'singleplayer' ? 'KI' : (data.winner === 'white' ? 'Weiß' : 'Schwarz');
+                        const winnerName = this.gameMode === 'singleplayer' ? 'KaI' : (data.winner === 'white' ? 'Weiß' : 'Schwarz');
                         this.showDefeatMessage(data.winner, data.winCondition);
                     }
                 }
@@ -1396,7 +1394,7 @@
                             if (gameState.currentPlayer === this.playerColor) {
                                 statusText = 'Dein Zug!';
                             } else {
-                                statusText = 'KI denkt nach...';
+                                statusText = 'KaI denkt nach...';
                             }
                         } else {
                             const currentPlayerName = gameState.currentPlayer === 'white' ? 'Weiß' : 'Schwarz';

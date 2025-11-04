@@ -17,17 +17,19 @@ let players = new Map();
 let chatMessages = new Map();
 
 
-
 // KI-Klasse für den Computer-Gegner
 class ComputerPlayer {
     constructor(difficulty = 'medium') {
         this.difficulty = difficulty;
         this.name = `KI-${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`;
+        // für Trace
+        this.minMaxCount = 0;  // globaler Zähler
+
     }
 
     // Hauptmethode für KI-Zug
     makeMove(board, playerColor) {
-        console.log(`KI (${this.difficulty}) denkt nach...`);
+        console.log(`KaI (${this.difficulty}) denkt nach...`);
         
         switch (this.difficulty) {
             case 'easy':
@@ -73,14 +75,24 @@ class ComputerPlayer {
         const validMoves = this.getValidMoves(board);
         
         // Für die ersten paar Züge verwende mittlere Strategie (Performance)
-        if (this.countPieces(board) < 4) {
-            return this.makeMediumMove(board, playerColor);
-        }
+        //if (this.countPieces(board) < 4) {
+        //    return this.makeMediumMove(board, playerColor);
+        //}
+
+        // 1. Prüfe auf sofortigen Sieg
+        const winningMove = this.findWinningMove(board, playerColor, validMoves);
+        if (winningMove) return winningMove;
         
-        // Verwende Minimax mit begrenzter Tiefe
+        // 2. Blockiere gegnerischen Sieg
+        const opponentColor = playerColor === 'white' ? 'black' : 'white';
+        const blockingMove = this.findWinningMove(board, opponentColor, validMoves);
+        if (blockingMove) return blockingMove;
+        
+        // 3. Verwende Minimax mit begrenzter Tiefe
         let bestScore = -Infinity;
         let bestMove = validMoves[0];
         
+        this.minMaxCount = 0;  // normiere Zähler
         for (const move of validMoves) {
             // Simuliere Zug
             const newBoard = this.cloneBoard(board);
@@ -94,6 +106,11 @@ class ComputerPlayer {
                 bestMove = move;
             }
         }
+        console.log('makeHardMove:', {
+                minMaxCount: this.minMaxCount,
+                bestScore: bestScore,
+                bestMove: bestMove
+        });
         
         return bestMove;
     }
@@ -102,9 +119,13 @@ class ComputerPlayer {
     minimax(board, depth, isMaximizing, playerColor, alpha = -Infinity, beta = Infinity) {
         const opponentColor = playerColor === 'white' ? 'black' : 'white';
         const currentColor = isMaximizing ? playerColor : opponentColor;
+
+        this.minMaxCount = this.minMaxCount + 1;  // globalen Zähler inkrementieren
         
         // Blattevaluation oder maximale Tiefe erreicht
         if (depth === 0 || this.isBoardFull(board)) {
+            // too much logging
+            //console.log('minimax:', { depth: depth, isBoardFull: this.isBoardFull(board) });
             return this.evaluateBoard(board, playerColor);
         }
         
@@ -122,6 +143,8 @@ class ComputerPlayer {
                 
                 if (beta <= alpha) break; // Alpha-Beta Pruning
             }
+            // too much logging
+            //console.log('minimax:', { maxEval: maxEval, alpha: alpha, beta: beta });
             return maxEval;
         } else {
             let minEval = Infinity;
@@ -135,6 +158,8 @@ class ComputerPlayer {
                 
                 if (beta <= alpha) break; // Alpha-Beta Pruning
             }
+            // too much logging
+            //console.log('minimax:', { minEval: minEval, alpha: alpha, beta: beta });
             return minEval;
         }
     }
@@ -533,7 +558,8 @@ class Game {
     }
 
     // singleplayer: Spielmodus setzen
-    setGameMode(mode, difficulty = 'medium') {
+    //setGameMode(mode, difficulty = 'medium') {
+    setGameMode(mode, difficulty) {
         this.gameMode = mode;
         if (mode === 'singleplayer') {
             this.computerPlayer = new ComputerPlayer(difficulty);
@@ -552,7 +578,7 @@ class Game {
         const move = this.computerPlayer.makeMove(this.board, this.currentPlayer);
         
         if (move) {
-            console.log(`KI setzt auf Position (${move.row}, ${move.col})`);
+            console.log(`KaI setzt auf Position (${move.row}, ${move.col})`);
             return this.makeMove('computer', move.row, move.col);
         }
         
@@ -568,8 +594,9 @@ class Game {
             if (isSinglePlayer) {
                 this.players.black = 'computer';
                 this.status = 'playing';
-                this.setGameMode('singleplayer', 'medium');
-                console.log(`Einzelspieler-Spiel gestartet: Mensch (${playerId}) vs KI`);
+                //this.setGameMode('singleplayer', 'medium');
+                this.setGameMode('singleplayer', null);
+                console.log(`Einzelspieler-Spiel gestartet: Mensch (${playerId}) vs KaI`);
             }
             
             return 'white';
@@ -587,7 +614,7 @@ class Game {
 
     // Korrektur: Spezielle Methode für Einzelspieler-Beitritt
     // Vereinfachte Methode nur für Einzelspieler
-    addSinglePlayer(playerId, difficulty = 'medium') {
+    addSinglePlayer(playerId, difficulty) {
 /*
         if (!this.players.white) {
             this.players.white = playerId;
@@ -607,7 +634,7 @@ class Game {
         
         console.log(`Einzelspieler-Spiel ${this.id} gestartet:`);
         console.log(`- Mensch: ${playerId} (weiß)`);
-        console.log(`- KI: computer (schwarz, ${difficulty})`);
+        console.log(`- KaI: computer (schwarz, ${difficulty})`);
         console.log(`- Status: ${this.status}`);
         console.log(`- Startspieler: weiß`); // ${this.currentPlayer}
         
@@ -660,7 +687,9 @@ class Game {
                     largestAreaSize: largestAreaResult.size,
                     winningCells: largestAreaResult.winningCells,
                     opponentCells: largestAreaResult.opponentCells,
-                    isComputerMove: isComputerMove
+                    isComputerMove: isComputerMove,
+                    row,
+                    col
                 };
             } else {
                 // Normale Siegbedingung
@@ -673,7 +702,9 @@ class Game {
                     gameFinished: true,
                     winner: this.currentPlayer,
                     winCondition: winCondition,
-                    isComputerMove: isComputerMove
+                    isComputerMove: isComputerMove,
+                    row,
+                    col
                 };
             }
         }
@@ -689,7 +720,9 @@ class Game {
                 gameFinished: true,
                 winner: 'draw',
                 winCondition: 'unentschieden',
-                isComputerMove: isComputerMove
+                isComputerMove: isComputerMove,
+                row,
+                col
             };
         }
 
@@ -1125,7 +1158,7 @@ class Game {
 
 // Neue Spielsession erstellen
 app.post('/api/games', (req, res) => {
-    console.log(`   POST /api/games               - Neues Spiel erstellen`);
+    console.log(`   POST /api/games                        - Neues Spiel erstellen`);
     const game = new Game();
     games.set(game.id, game);
     
@@ -1140,9 +1173,9 @@ app.post('/api/games', (req, res) => {
 
 // Spiel beitreten
 app.post('/api/games/:gameId/join', (req, res) => {
-    console.log(`   POST /api/games/:gameId/join  - Spiel beitreten`);
     const { gameId } = req.params;
     const { playerName } = req.body;
+    console.log(`   POST /api/games/${gameId}/join  - Spiel beitreten`);
 
     if (!games.has(gameId)) {
         return res.status(404).json({ success: false, error: 'Spiel nicht gefunden' });
@@ -1180,9 +1213,9 @@ app.post('/api/games/:gameId/join', (req, res) => {
 
 // Zug machen
 app.post('/api/games/:gameId/move', (req, res) => {
-    console.log(`   POST /api/games/:gameId/move  - Zug machen`);
     const { gameId } = req.params;
     const { playerId, row, col } = req.body;
+    console.log(`   POST /api/games/${gameId}/move  - Zug machen`);
 
     if (!games.has(gameId)) {
         return res.status(404).json({ success: false, error: 'Spiel nicht gefunden' });
@@ -1237,7 +1270,7 @@ app.get('/api/games/:gameId', (req, res) => {
 
 // Aktive Spiele auflisten
 app.get('/api/games', (req, res) => {
-    console.log(`   GET  /api/games               - Aktive Spiele auflisten`);
+    console.log(`   GET  /api/games                        - Aktive Spiele auflisten`);
     const activeGames = Array.from(games.values())
         .filter(game => game.status === 'waiting' || game.status === 'playing')
         .map(game => ({
@@ -1256,7 +1289,7 @@ app.get('/api/games', (req, res) => {
 
 // Spielerinformationen abrufen
 app.get('/api/players/:playerId', (req, res) => {
-    console.log(`   GET  /api/players/:playerId   - Spielerinformationen abrufen`);
+    console.log(`   GET  /api/players/:playerId            - Spielerinformationen abrufen`);
     const { playerId } = req.params;
 
     if (!players.has(playerId)) {
@@ -1272,9 +1305,9 @@ app.get('/api/players/:playerId', (req, res) => {
 
 // Spiel verlassen
 app.post('/api/games/:gameId/leave', (req, res) => {
-    console.log(`   POST /api/games/:gameId/leave - Spiel verlassen`);
     const { gameId } = req.params;
     const { playerId } = req.body;
+    console.log(`   POST /api/games/${gameId}/leave - Spiel verlassen`);
 
     if (!games.has(gameId)) {
         return res.status(404).json({ success: false, error: 'Spiel nicht gefunden' });
@@ -1304,9 +1337,9 @@ app.post('/api/games/:gameId/leave', (req, res) => {
 
 // Chat-Nachricht senden
 app.post('/api/games/:gameId/chat', (req, res) => {
-    console.log(`   POST /api/games/:gameId/chat  - Chat-Nachricht senden`);
     const { gameId } = req.params;
     const { playerId, message } = req.body;
+    console.log(`   POST /api/games/${gameId}/chat  - Chat-Nachricht senden`);
 
     if (!games.has(gameId)) {
         return res.status(404).json({ success: false, error: 'Spiel nicht gefunden' });
@@ -1393,7 +1426,7 @@ setInterval(cleanupOldGames, 60 * 60 * 1000);
 
 // Server-Status abfragen
 app.get('/api/status', (req, res) => {
-    console.log(`   GET  /api/status              - Server-Status`);
+    console.log(`   GET  /api/status                       - Server-Status`);
     const activeGamesCount = Array.from(games.values())
         .filter(game => game.status === 'waiting' || game.status === 'playing').length;
     
@@ -1433,13 +1466,15 @@ app.use((error, req, res, next) => {
 /* ALTERNATIV
 // Spezieller Endpoint für Einzelspieler-Beitritt
 app.post('/api/games/singleplayer/join', (req, res) => {
-    const { playerName, difficulty = 'medium' } = req.body;
+    console.log(`   POST /api/games/singleplayer/join      - Spezieller Endpoint für singleplayer-Beitritt`);
+ // const { playerName, difficulty = 'medium' } = req.body;
+    const { playerName, difficulty } = req.body;
     
     const game = new Game();
     game.setGameMode('singleplayer', difficulty);
     
     const playerId = uuidv4();
-    const color = game.addSinglePlayer(playerId);  // Verwende spezielle Methode
+    const color = game.addSinglePlayer(playerId, difficulty);  // Verwende spezielle Methode
     
     if (!color) {
         return res.status(400).json({ success: false, error: 'Spieler konnte nicht hinzugefügt werden' });
@@ -1454,7 +1489,7 @@ app.post('/api/games/singleplayer/join', (req, res) => {
         gameId: game.id
     });
 
-    console.log(`Einzelspieler-Spiel ${game.id} gestartet: ${playerName} (${color}) vs KI`);
+    console.log(`Einzelspieler-Spiel ${game.id} gestartet: ${playerName} (${color}) vs KaI (${difficulty})`);
 
     res.json({
         success: true,
@@ -1469,9 +1504,11 @@ app.post('/api/games/singleplayer/join', (req, res) => {
 
 // GEÄNDERT: singleplayer: API-Endpoints für Einzelspieler
 app.post('/api/games/singleplayer', (req, res) => {
+    console.log(`   POST /api/games/singleplayer           - singleplayer`);
  // const { difficulty = 'medium' } = req.body;
-    const { difficulty } = req.body;
-    const { playerName } = req.body;
+ // const { difficulty } = req.body;
+ // const { playerName } = req.body;
+    const { playerName, difficulty } = req.body;
     
     const game = new Game();
     game.setGameMode('singleplayer', difficulty);
@@ -1487,7 +1524,7 @@ app.post('/api/games/singleplayer', (req, res) => {
 */
     const playerId = uuidv4();
     // Korrektur: Spezielle Methode für Einzelspieler-Beitritt
-    const color = game.addSinglePlayer(playerId);
+    const color = game.addSinglePlayer(playerId, difficulty);
     
     if (!color) {
         return res.status(400).json({ success: false, error: 'Spieler konnte nicht hinzugefügt werden' });
@@ -1500,7 +1537,7 @@ app.post('/api/games/singleplayer', (req, res) => {
         color: color,
         gameId: game.id
     });
-    console.log(`Einzelspieler-Spiel ${game.id} gestartet: ${playerName} (${color}) vs KI`);
+    console.log(`Einzelspieler-Spiel ${game.id} gestartet: ${playerName} (${color}) vs KaI (${difficulty})`);
 
     res.json({
         success: true,
@@ -1516,6 +1553,7 @@ app.post('/api/games/singleplayer', (req, res) => {
 
 app.post('/api/games/:gameId/computer/move', (req, res) => {
     const { gameId } = req.params;
+    console.log(`   POST /api/games/${gameId}/computer/move  - singleplayer computer/move`);
 
     if (!games.has(gameId)) {
         return res.status(404).json({ success: false, error: 'Spiel nicht gefunden' });
@@ -1586,6 +1624,7 @@ app.listen(PORT, () => {
     console.log(`   POST /api/games/:gameId/computer/move  - singleplayer computer/move`);
     console.log(`   POST /api/games/singleplayer/join      - Spezieller Endpoint für singleplayer-Beitritt`);
     console.log(`   GET  /api/debug/games/:gameId          - DEBUG: Endpoint zum Prüfen des Spielstatus`);
+    console.log(`---`);
 });
 
 // Graceful Shutdown
