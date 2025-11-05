@@ -467,7 +467,7 @@
 </head>
 
 <body>
-    <div class="version">v2.01</div>
+    <div class="version">v2.02</div>
 
     <h1>jk-go - 6x6 Brettspiel - Multi/Single-Player + Chat</h1>
     
@@ -805,7 +805,7 @@
             async createSinglePlayerGame() {
                 const difficulty = this.difficultySelect ? this.difficultySelect.value : 'medium';
                 const playerName = document.getElementById('playerName').value || 'Spieler';
-        
+
                 try {
                     const response = await fetch(`${API_BASE}/games/singleplayer`, {
                         method: 'POST',
@@ -1184,6 +1184,7 @@
                     const data = await response.json();
                     
                     if (data.success) {
+                        this.gameMode = 'multiplayer';
                         this.gameId = data.gameId;
                         await this.joinGame(this.gameId);
                     } else {

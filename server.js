@@ -22,8 +22,8 @@ class ComputerPlayer {
     constructor(difficulty = 'medium') {
         this.difficulty = difficulty;
         this.name = `KI-${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`;
-        // für Trace
-        this.minMaxCount = 0;  // globaler Zähler
+        // für erweitertes Trace
+        //this.minMaxCount = 0;  // globaler Zähler
 
     }
 
@@ -73,58 +73,80 @@ class ComputerPlayer {
     // Schwerer KI-Zug: Minimax-Algorithmus
     makeHardMove(board, playerColor) {
         const validMoves = this.getValidMoves(board);
-        
+        const opponentColor = playerColor === 'white' ? 'black' : 'white';
+    
         // Für die ersten paar Züge verwende mittlere Strategie (Performance)
         //if (this.countPieces(board) < 4) {
         //    return this.makeMediumMove(board, playerColor);
         //}
-
+    
         // 1. Prüfe auf sofortigen Sieg
         const winningMove = this.findWinningMove(board, playerColor, validMoves);
-        if (winningMove) return winningMove;
-        
+        if (winningMove) {
+            console.log(`(1) KI macht Gewinnzug bei (${winningMove.row},${winningMove.col})`);
+            return winningMove;
+        }
+    
         // 2. Blockiere gegnerischen Sieg
-        const opponentColor = playerColor === 'white' ? 'black' : 'white';
         const blockingMove = this.findWinningMove(board, opponentColor, validMoves);
-        if (blockingMove) return blockingMove;
-        
-        // 3. Verwende Minimax mit begrenzter Tiefe
+        if (blockingMove) {
+            console.log(`(2) KI blockiert Gewinnzug bei (${blockingMove.row},${blockingMove.col})`);
+            return blockingMove;
+        }
+    
+        // 3. ERWEITERT: Erweiterte Blocking-Logik für kritische Muster
+        const advancedBlockingMove = this.findAdvancedBlockingMoves(board, opponentColor, validMoves);
+        if (advancedBlockingMove) {
+            console.log(`(3) KI erweitertes Blocking bei (${advancedBlockingMove.row},${advancedBlockingMove.col})`);
+            return advancedBlockingMove;
+        }
+    
+        // 4. Strategische Position wählen
+        const strategicMove = this.findStrategicMove(board, playerColor, validMoves);
+        if (strategicMove)  {
+            console.log(`(4) KI strategischer Zug bei (${strategicMove.row},${strategicMove.col})`);
+            return strategicMove;
+        }
+    
+        // 5. Verwende Minimax als Fallback
         let bestScore = -Infinity;
         let bestMove = validMoves[0];
-        
-        this.minMaxCount = 0;  // normiere Zähler
+    
+        // für erweitertes Trace
+        //this.minMaxCount = 0;  // normiere Zähler
         for (const move of validMoves) {
             // Simuliere Zug
             const newBoard = this.cloneBoard(board);
             newBoard[move.row][move.col] = playerColor;
-            
+        
             // Bewertung mit Minimax
             const score = this.minimax(newBoard, 2, false, playerColor);
-            
+        
             if (score > bestScore) {
                 bestScore = score;
                 bestMove = move;
             }
         }
-        console.log('makeHardMove:', {
-                minMaxCount: this.minMaxCount,
-                bestScore: bestScore,
-                bestMove: bestMove
-        });
-        
+        // für erweitertes Trace
+        //console.log('makeHardMove:', { minMaxCount: this.minMaxCount, bestScore: bestScore, bestMove: bestMove });
+    
+        console.log(`(5) KI macht Minimax-Zug bei (${bestMove.row},${bestMove.col}) mit Score: ${bestScore}`);
         return bestMove;
     }
+
+
 
     // Minimax-Algorithmus mit Alpha-Beta-Pruning
     minimax(board, depth, isMaximizing, playerColor, alpha = -Infinity, beta = Infinity) {
         const opponentColor = playerColor === 'white' ? 'black' : 'white';
         const currentColor = isMaximizing ? playerColor : opponentColor;
 
-        this.minMaxCount = this.minMaxCount + 1;  // globalen Zähler inkrementieren
+        // für erweitertes Trace
+        //this.minMaxCount = this.minMaxCount + 1;  // globalen Zähler inkrementieren
         
         // Blattevaluation oder maximale Tiefe erreicht
         if (depth === 0 || this.isBoardFull(board)) {
-            // too much logging
+            // erweitertes Trace: too much logging
             //console.log('minimax:', { depth: depth, isBoardFull: this.isBoardFull(board) });
             return this.evaluateBoard(board, playerColor);
         }
@@ -143,7 +165,7 @@ class ComputerPlayer {
                 
                 if (beta <= alpha) break; // Alpha-Beta Pruning
             }
-            // too much logging
+            // erweitertes Trace: too much logging
             //console.log('minimax:', { maxEval: maxEval, alpha: alpha, beta: beta });
             return maxEval;
         } else {
@@ -158,7 +180,7 @@ class ComputerPlayer {
                 
                 if (beta <= alpha) break; // Alpha-Beta Pruning
             }
-            // too much logging
+            // erweitertes Trace: too much logging
             //console.log('minimax:', { minEval: minEval, alpha: alpha, beta: beta });
             return minEval;
         }
@@ -337,6 +359,280 @@ class ComputerPlayer {
         
         return centerControl;
     }
+
+////// begin: NEUE METHODEN FÜR  makeHardMove()  ////////////////////////////
+// NEUE METHODE: Findet kritische 3er-Reihen die blockiert werden müssen
+findCriticalThreeInRowBlock(board, opponentColor, validMoves) {
+    const directions = [
+        { dr: 0, dc: 1, name: 'horizontal' },    // horizontal
+        { dr: 1, dc: 0, name: 'vertikal' },      // vertikal
+        { dr: 1, dc: 1, name: 'diagonal_rechts' }, // diagonal ↘
+        { dr: 1, dc: -1, name: 'diagonal_links' }  // diagonal ↙
+    ];
+    
+    for (let row = 0; row < 6; row++) {
+        for (let col = 0; col < 6; col++) {
+            for (const dir of directions) {
+                const criticalMove = this.checkThreeInRowWithFreeEnds(
+                    board, row, col, opponentColor, dir, validMoves
+                );
+                if (criticalMove) {
+                    return criticalMove;
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+// NEUE METHODE: Prüft spezifisch auf 3er-Reihen mit freien Enden
+checkThreeInRowWithFreeEnds(board, startRow, startCol, opponentColor, direction, validMoves) {
+    const { dr, dc } = direction;
+    
+    // Prüfe ob wir eine 3er-Reihe des Gegners haben
+    let threeInRow = true;
+    const sequence = [];
+    
+    // Sammle die 3er-Sequenz
+    for (let i = 0; i < 3; i++) {
+        const r = startRow + (dr * i);
+        const c = startCol + (dc * i);
+        
+        // Prüfe Grenzen
+        if (r < 0 || r >= 6 || c < 0 || c >= 6) {
+            threeInRow = false;
+            break;
+        }
+        
+        sequence.push({ row: r, col: c, value: board[r][c] });
+    }
+    
+    if (!threeInRow) return null;
+    
+    // Prüfe ob alle 3 Felder die gegnerische Farbe haben
+    const allOpponent = sequence.every(cell => cell.value === opponentColor);
+    if (!allOpponent) return null;
+    
+    // Jetzt prüfen wir die Enden der Reihe
+    
+    // Linkes/oberes Ende
+    const leftEndRow = startRow - dr;
+    const leftEndCol = startCol - dc;
+    const leftEndValid = this.isValidPosition(leftEndRow, leftEndCol);
+    const leftEndFree = leftEndValid ? board[leftEndRow][leftEndCol] === null : false;
+    
+    // Rechtes/unteres Ende
+    const rightEndRow = startRow + (dr * 3);
+    const rightEndCol = startCol + (dc * 3);
+    const rightEndValid = this.isValidPosition(rightEndRow, rightEndCol);
+    const rightEndFree = rightEndValid ? board[rightEndRow][rightEndCol] === null : false;
+    
+    // Prüfe spezielle Bedingung: Beide Enden frei UND mindestens eine Seite hat 2 freie Plätze
+    if (leftEndFree && rightEndFree) {
+        // Prüfe linke Seite auf 2 freie Plätze
+        const leftSecondRow = startRow - (dr * 2);
+        const leftSecondCol = startCol - (dc * 2);
+        const leftSecondValid = this.isValidPosition(leftSecondRow, leftSecondCol);
+        const leftSecondFree = leftSecondValid ? board[leftSecondRow][leftSecondCol] === null : false;
+        
+        // Prüfe rechte Seite auf 2 freie Plätze
+        const rightSecondRow = startRow + (dr * 4);
+        const rightSecondCol = startCol + (dc * 4);
+        const rightSecondValid = this.isValidPosition(rightSecondRow, rightSecondCol);
+        const rightSecondFree = rightSecondValid ? board[rightSecondRow][rightSecondCol] === null : false;
+        
+        console.log(`Kritische 3er-Reihe gefunden bei (${startRow},${startCol}) Richtung ${direction.name}`);
+        console.log(`- Linkes Ende: (${leftEndRow},${leftEndCol}) frei: ${leftEndFree}`);
+        console.log(`- Rechtes Ende: (${rightEndRow},${rightEndCol}) frei: ${rightEndFree}`);
+        console.log(`- Linke 2. Position frei: ${leftSecondFree}`);
+        console.log(`- Rechte 2. Position frei: ${rightSecondFree}`);
+        
+        // Blockierungsstrategie: Blockiere die Seite mit 2 freien Plätzen
+        if (leftSecondFree) {
+            // Blockiere das Feld direkt neben der 3er-Reihe auf der linken Seite
+            const blockingMove = { row: leftEndRow, col: leftEndCol };
+            if (this.isValidMove(blockingMove, validMoves)) {
+                console.log(`Blockiere linkes Ende bei (${blockingMove.row},${blockingMove.col})`);
+                return blockingMove;
+            }
+        }
+        
+        if (rightSecondFree) {
+            // Blockiere das Feld direkt neben der 3er-Reihe auf der rechten Seite
+            const blockingMove = { row: rightEndRow, col: rightEndCol };
+            if (this.isValidMove(blockingMove, validMoves)) {
+                console.log(`Blockiere rechtes Ende bei (${blockingMove.row},${blockingMove.col})`);
+                return blockingMove;
+            }
+        }
+        
+        // Falls beide Seiten 2 freie Plätze haben oder keine spezifische Seite, blockiere ein Ende
+        if (leftEndFree && this.isValidMove({ row: leftEndRow, col: leftEndCol }, validMoves)) {
+            console.log(`Blockiere Standard linkes Ende bei (${leftEndRow},${leftEndCol})`);
+            return { row: leftEndRow, col: leftEndCol };
+        }
+        
+        if (rightEndFree && this.isValidMove({ row: rightEndRow, col: rightEndCol }, validMoves)) {
+            console.log(`Blockiere Standard rechtes Ende bei (${rightEndRow},${rightEndCol})`);
+            return { row: rightEndRow, col: rightEndCol };
+        }
+    }
+    
+    return null;
+}
+
+// NEUE METHODE: Erweiterte Blocking-Logik für verschiedene kritische Muster
+findAdvancedBlockingMoves(board, opponentColor, validMoves) {
+    const criticalMoves = [];
+    
+    // 1. Blockiere 3er-Reihen mit freien Enden (Hauptlogik)
+    const threeInRowBlock = this.findCriticalThreeInRowBlock(board, opponentColor, validMoves);
+    if (threeInRowBlock) criticalMoves.push(threeInRowBlock);
+    
+    // 2. Blockiere fast-vollständige Rechtecke
+    const rectangleBlock = this.findRectangleBlockingMove(board, opponentColor, validMoves);
+    if (rectangleBlock) criticalMoves.push(rectangleBlock);
+    
+    // 3. Blockiere fast-vollständige Regionen
+    const regionBlock = this.findRegionBlockingMove(board, opponentColor, validMoves);
+    if (regionBlock) criticalMoves.push(regionBlock);
+    
+    // 4. Blockiere 4er-Reihen (sehr kritisch!)
+    const fourInRowBlock = this.findFourInRowBlock(board, opponentColor, validMoves);
+    if (fourInRowBlock) criticalMoves.push(fourInRowBlock);
+    
+    return criticalMoves.length > 0 ? criticalMoves[0] : null;
+}
+
+// NEUE METHODE: Blockiere fast-vollständige Rechtecke
+findRectangleBlockingMove(board, opponentColor, validMoves) {
+    // Prüfe 3x2 Rechtecke (1 Feld fehlt)
+    for (let startRow = 0; startRow <= 3; startRow++) {
+        for (let startCol = 0; startCol <= 4; startCol++) {
+            let opponentCount = 0;
+            let emptyCell = null;
+            
+            for (let row = startRow; row < startRow + 3; row++) {
+                for (let col = startCol; col < startCol + 2; col++) {
+                    if (board[row][col] === opponentColor) opponentCount++;
+                    else if (board[row][col] === null) emptyCell = { row, col };
+                }
+            }
+            
+            if (opponentCount === 5 && emptyCell && this.isValidMove(emptyCell, validMoves)) {
+                console.log(`Blockiere fast-vollständiges 3x2 Rechteck bei (${emptyCell.row},${emptyCell.col})`);
+                return emptyCell;
+            }
+        }
+    }
+    
+    // Prüfe 2x3 Rechtecke (1 Feld fehlt)
+    for (let startRow = 0; startRow <= 4; startRow++) {
+        for (let startCol = 0; startCol <= 3; startCol++) {
+            let opponentCount = 0;
+            let emptyCell = null;
+            
+            for (let row = startRow; row < startRow + 2; row++) {
+                for (let col = startCol; col < startCol + 3; col++) {
+                    if (board[row][col] === opponentColor) opponentCount++;
+                    else if (board[row][col] === null) emptyCell = { row, col };
+                }
+            }
+            
+            if (opponentCount === 5 && emptyCell && this.isValidMove(emptyCell, validMoves)) {
+                console.log(`Blockiere fast-vollständiges 2x3 Rechteck bei (${emptyCell.row},${emptyCell.col})`);
+                return emptyCell;
+            }
+        }
+    }
+    
+    return null;
+}
+
+// NEUE METHODE: Blockiere fast-vollständige Regionen
+findRegionBlockingMove(board, opponentColor, validMoves) {
+    const regions = [
+        { rows: [0, 1], cols: [0, 1] }, { rows: [0, 1], cols: [2, 3] }, { rows: [0, 1], cols: [4, 5] },
+        { rows: [2, 3], cols: [0, 1] }, { rows: [2, 3], cols: [2, 3] }, { rows: [2, 3], cols: [4, 5] },
+        { rows: [4, 5], cols: [0, 1] }, { rows: [4, 5], cols: [2, 3] }, { rows: [4, 5], cols: [4, 5] }
+    ];
+    
+    for (const region of regions) {
+        let opponentCount = 0;
+        let emptyCell = null;
+        
+        for (const row of region.rows) {
+            for (const col of region.cols) {
+                if (board[row][col] === opponentColor) opponentCount++;
+                else if (board[row][col] === null) emptyCell = { row, col };
+            }
+        }
+        
+        // Blockiere wenn 3 von 4 Feldern vom Gegner besetzt sind
+        if (opponentCount === 3 && emptyCell && this.isValidMove(emptyCell, validMoves)) {
+            console.log(`Blockiere fast-vollständige Region bei (${emptyCell.row},${emptyCell.col})`);
+            return emptyCell;
+        }
+    }
+    
+    return null;
+}
+
+// NEUE METHODE: Blockiere 4er-Reihen (sehr kritisch!)
+findFourInRowBlock(board, opponentColor, validMoves) {
+    const directions = [
+        { dr: 0, dc: 1 }, { dr: 1, dc: 0 }, { dr: 1, dc: 1 }, { dr: 1, dc: -1 }
+    ];
+    
+    for (let row = 0; row < 6; row++) {
+        for (let col = 0; col < 6; col++) {
+            for (const dir of directions) {
+                // Prüfe 4er-Reihe
+                let fourInRow = true;
+                for (let i = 0; i < 4; i++) {
+                    const r = row + (dir.dr * i);
+                    const c = col + (dir.dc * i);
+                    if (!this.isValidPosition(r, c) || board[r][c] !== opponentColor) {
+                        fourInRow = false;
+                        break;
+                    }
+                }
+                
+                if (fourInRow) {
+                    // Prüfe Enden der 4er-Reihe
+                    const leftEnd = { row: row - dir.dr, col: col - dir.dc };
+                    const rightEnd = { row: row + (dir.dr * 4), col: col + (dir.dc * 4) };
+                    
+                    if (this.isValidMove(leftEnd, validMoves)) {
+                        console.log(`KRITISCH: Blockiere 4er-Reihe links bei (${leftEnd.row},${leftEnd.col})`);
+                        return leftEnd;
+                    }
+                    if (this.isValidMove(rightEnd, validMoves)) {
+                        console.log(`KRITISCH: Blockiere 4er-Reihe rechts bei (${rightEnd.row},${rightEnd.col})`);
+                        return rightEnd;
+                    }
+                }
+            }
+        }
+    }
+    
+    return null;
+}
+
+
+// HILFSMETHODEN
+isValidPosition(row, col) {
+    return row >= 0 && row < 6 && col >= 0 && col < 6;
+}
+
+isValidMove(move, validMoves) {
+    return validMoves.some(validMove => 
+        validMove.row === move.row && validMove.col === move.col
+    );
+}
+////// end: NEUE METHODEN FÜR  makeHardMove()  //////////////////////////////
+
 
     // Hilfsmethoden
     getValidMoves(board) {
