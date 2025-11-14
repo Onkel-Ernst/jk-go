@@ -271,7 +271,9 @@
         }
         
         .winning-piece {
-            animation: pulse 1s infinite, glow 2s infinite;
+            animation: pulse 2s infinite, glow 2s infinite;
+            border: 2px solid gold;
+            z-index: 4;
         }
         
         .region-complete {
@@ -467,7 +469,7 @@
 </head>
 
 <body>
-    <div class="version">v2.02</div>
+    <div class="version">v2.03</div>
 
     <h1>jk-go - 6x6 Brettspiel - Multi/Single-Player + Chat</h1>
     
@@ -671,11 +673,13 @@
                 );
             }
             
-            renderBoard(gameState) {
-                console.log('renderBoard:', {
+            renderBoard(gameState, winningCells) {
+                console.log('GameClient.renderBoard:', {
+                  //gameState: gameState,      // id, board[][], currentPlayer, players, status, winCondition, winner
                     status: gameState.status,
                     currentPlayer: gameState.currentPlayer,
-                    winCondition: gameState.winCondition
+                    winCondition: gameState.winCondition,
+                    winningCells: winningCells
                 });
 
                 this.currentGameState = gameState;
@@ -702,7 +706,7 @@
                         
                         // Prüfen ob Region komplett ist
                         if (region && regionStatus[region.id].complete) {
-                            // Region komplett NICHT sichtbat machen
+                            // Region komplett sichtbar machen
                             //cell.classList.add('region-complete');
                             cell.title += ` (Komplett: ${regionStatus[region.id].color})`;
                         }
@@ -719,15 +723,40 @@
                             this.playerColor === gameState.currentPlayer) {
                             cell.addEventListener('click', () => this.handleCellClick(row, col));
                         }
-                        
+
+                        // Sieg-Zellen hervorheben
+                        // bei unentschieden ist winner = 'draw' und winCondition = 'unentschieden'
+                        // dann wird KEIN groesstes_gebiet_ hervorgehoben
+                        if ( gameState.status === 'finished' && gameState.winner !== 'draw' 
+                             && gameState.winCondition.startsWith('groesstes_gebiet_') ) {
+                            //console.log('finished', {winningCells: winningCells.cells});
+                            // Prüfe, ob (row, col) in winningCells.cells
+                            // Error: innerArray.includes is not a function
+                            //if ( winningCells.cells.some(innerArray => innerArray.includes(row) && innerArray.includes(col)) ) {
+                            for (let i = 0; i < winningCells.cells.length; i++) {
+                                if ( row === winningCells.cells[i].row && col === winningCells.cells[i].col ) {
+                                    console.log('win: row, col ', row, col);
+                                    cell.classList.add('winning-piece');
+                                    break;
+                                }
+                            }
+                        }
+
                         this.gameBoard.appendChild(cell);
                     }
                 }
-                
+                // Gegner Board aktualisierren
+                if (gameState.status === 'finished') {
+                  console.log('GameClient.renderBoard: Game Finished -> aktualisiere Status');
+                  this.updateStatus(gameState);
+                  this.updateGameState();
+                }
+
                 // Regionen-Legende aktualisieren
                 this.updateRegionLegend(regionStatus);
             }
-            
+
+
             calculateRegionStatus(board) {
                 const regionStatus = {};
                 
@@ -841,7 +870,7 @@
                         this.updatePlayerInfo();
                         this.startGamePolling();
                         this.startChatPolling();
-                        this.renderBoard(data.gameState);
+                        this.renderBoard(data.gameState, data.winningCells || []);
                         this.updateStatus(data.gameState);
             
                         this.addSystemMessage(`Einzelspieler-Modus gestartet! Schwierigkeit: ${this.computerDifficulty}`);
@@ -897,7 +926,7 @@
                         // Einzelspieler darf nicht warten
                         data.gameState = 'playing';
 
-                        this.renderBoard(data.gameState);
+                        this.renderBoard(data.gameState, data.winningCells || []);
                         this.updateStatus(data.gameState);
                 
                         this.addSystemMessage(`Einzelspieler-Modus gestartet! Schwierigkeit: ${this.computerDifficulty}`);
@@ -937,12 +966,14 @@
             
                     if (data.success) {
                         this.enableBoard();
-                        this.renderBoard(data.game);
+                        this.renderBoard(data.game, data.winningCells || []);
                         this.updateStatus(data.game);
                         const computerMove = '' + data.row + ',' + data.col;
                         this.addSystemMessage(`KaI hat gesetzt auf (${data.isComputerMove ? computerMove : 'unbekannt'})`, true);
                 
+                        console.log('makeComputerMove:', { row: data.row, col: data.col});
                         if (data.gameFinished) {
+                            console.log('makeComputerMove: gameFinished - KaI');
                             this.handleGameFinished(data);
                         }
                     } else {
@@ -1217,7 +1248,7 @@
                         this.updatePlayerInfo();
                         this.startGamePolling();
                         this.startChatPolling(); // Chat-Polling starten
-                        this.renderBoard(data.gameState);
+                        this.renderBoard(data.gameState, data.winningCells || []);
                         this.updateStatus(data.gameState);
                         
                         // Willkommensnachricht im Chat
@@ -1252,15 +1283,22 @@
                     
                     if (data.success) {
                         // Render Board mit eventuellen Gewinner-Zellen
+                        // REMARK: Wird bei unentschieden aufgerufen
                         if (data.winCondition && data.winCondition.startsWith('groesstes_gebiet_')) {
+                            console.log('call renderBoard - groesstes_gebiet: ', 
+                                        {   winningCells: data.winningCells      // undefined!
+                                          , opponentCells: data.opponentCells    // undefined!
+                                        });
                             this.renderBoard(data.game, data.winningCells || [], data.opponentCells || []);
                         } else {
-                            this.renderBoard(data.game);
+                            console.log('makeMove:', { row: row, col: col});
+                            this.renderBoard(data.game, data.winningCells || []);
                         }
                 
                         this.updateStatus(data.game);
                         
                         if (data.gameFinished) {
+                            console.log('makeMove: gameFinished - Mensch');
                             this.handleGameFinished(data);
                         }
                     } else {
@@ -1273,6 +1311,8 @@
 
             // singleplayer: Spielende behandeln
             handleGameFinished(data) {
+                //console.log('handleGameFinished:', { winner: data.winner, winCondition: data.winCondition} );
+                console.log('handleGameFinished:', { data: data} );
                 if (this.pollInterval) {
                     clearInterval(this.pollInterval);
                     this.pollInterval = null;
@@ -1361,7 +1401,7 @@
                     
                     if (data.success && this.currentGameState) {
                         if (JSON.stringify(data.game) !== JSON.stringify(this.currentGameState)) {
-                            this.renderBoard(data.game);
+                            this.renderBoard(data.game, data.winningCells || []);
                             this.updateStatus(data.game);
                         }
                     }
@@ -1452,7 +1492,7 @@
                 const winText = this.getWinConditionText(winCondition);
                 setTimeout(() => {
                     alert(`🎉 Herzlichen Glückwunsch! Du hast gewonnen!\nGrund: ${winText}`);
-                }, 500);
+                }, 1500);
             }
             
             showDefeatMessage(winner, winCondition) {
@@ -1460,7 +1500,7 @@
                 const winnerName = winner === 'white' ? 'Weiß' : 'Schwarz';
                 setTimeout(() => {
                     alert(`😔 ${winnerName} hat gewonnen!\nGrund: ${winText}`);
-                }, 500);
+                }, 1500);
             }
 
             // Erweiterung "Größtes Gebiet"
@@ -1472,7 +1512,7 @@
                 }
                 setTimeout(() => {
                     alert(`🤝 ${message}`);
-                }, 500);
+                }, 1500);
             }
 
             async loadGames() {

@@ -783,7 +783,7 @@ isValidMove(move, validMoves) {
         return coveredRegions >= 2;
     }
 
-    floodFillArea(board, startRow, startCol, targetColor, visited) {
+    floodFillArea(board, startRow, startCol, color, visited) {
         const directions = [{ dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 }];
         const stack = [{ row: startRow, col: startCol }];
         let size = 0;
@@ -794,7 +794,7 @@ isValidMove(move, validMoves) {
             
             if (row < 0 || row >= 6 || col < 0 || col >= 6) continue;
             if (visited[row][col]) continue;
-            if (board[row][col] !== targetColor) continue;
+            if (board[row][col] !== color) continue;
             
             visited[row][col] = true;
             size++;
@@ -828,6 +828,7 @@ isValidMove(move, validMoves) {
                 if (board[row][col] === null) return false;
             }
         }
+        console.log('Computer: Brett komplett gefüllt!');
         return true;
     }
 }   // Ende KI-Klasse für den Computer-Gegner (ComputerPlayer)
@@ -1009,6 +1010,7 @@ class Game {
             this.status = 'finished';
             this.winner = 'draw';
             this.winCondition = 'unentschieden';
+            console.log('isBoardFull: unentschieden.');
             
             return { 
                 success: true, 
@@ -1280,6 +1282,7 @@ class Game {
     // Erweiterung "Größtes Gebiet"
     // 4. Findet das größte zusammenhängende Gebiet
     findLargestConnectedArea() {
+        console.log(`Suche Größte Gebiete ...`);
         const board = this.board;
         const visited = Array(6).fill().map(() => Array(6).fill(false));
         let whiteAreas = [];
@@ -1303,27 +1306,54 @@ class Game {
             }
         }
 
-        // Finde größtes Gebiet für jede Farbe
+        // Finde Anzahl Steine größtes Gebiet für jede Farbe
         const largestWhite = whiteAreas.length > 0 ? 
             Math.max(...whiteAreas.map(area => area.size)) : 0;
         const largestBlack = blackAreas.length > 0 ? 
             Math.max(...blackAreas.map(area => area.size)) : 0;
 
+        // Finde Gebiet mit der größten Anzahl Steine für jede Farbe 
+        let areaMaxWhite = [];
+        for (let i = 0; i < whiteAreas.length; i++) {
+            if (whiteAreas[i].size === largestWhite) {
+                areaMaxWhite = whiteAreas[i];
+                break;
+            }
+        }
+        let areaMaxBlack = [];
+        for (let i = 0; i < blackAreas.length; i++) {
+            if (blackAreas[i].size === largestBlack) {
+                areaMaxBlack = blackAreas[i];
+                break;
+            }
+        }
+
         console.log(`Größte Gebiete - Weiß: ${largestWhite}, Schwarz: ${largestBlack}`);
+        //console.log(`areaMaxWhite: `, JSON.stringify(areaMaxWhite));
+        //console.log(`areaMaxBlack: `, JSON.stringify(areaMaxBlack));
     
         // Bestimme Gewinner
         if (largestWhite > largestBlack) {
-            return { winner: 'white', size: largestWhite };
+            //console.log(`winningCells: `, areaMaxWhite);
+            return { winner: 'white', size: largestWhite
+                   , winningCells: areaMaxWhite
+                   , opponentCells: areaMaxBlack
+                   };
         } else if (largestBlack > largestWhite) {
-            return { winner: 'black', size: largestBlack };
+            //console.log(`winningCells: `, areaMaxBlack.cells);
+            return { winner: 'black', size: largestBlack
+                   , winningCells: areaMaxBlack
+                   , opponentCells: areaMaxWhite
+                   };
         } else {
             // Unentschieden bei gleicher Größe
+            //console.log(`winner: 'draw', size: ${largestWhite}`);
             return { winner: 'draw', size: largestWhite };
         }
     }
 
     // NEUE METHODE: Flood-Fill Algorithmus für zusammenhängende Gebiete
-    floodFill(startRow, startCol, targetColor, visited, currentArea) {
+    floodFill(startRow, startCol, color, visited, currentArea) {
         const directions = [
             { dr: -1, dc: 0 },  // oben
             { dr: 1, dc: 0 },   // unten
@@ -1341,7 +1371,7 @@ class Game {
             // Prüfe Grenzen und ob bereits besucht
             if (row < 0 || row >= 6 || col < 0 || col >= 6) continue;
             if (visited[row][col]) continue;
-            if (this.board[row][col] !== targetColor) continue;
+            if (this.board[row][col] !== color) continue;
 
             // Markiere als besucht und zähle
             visited[row][col] = true;
@@ -1357,7 +1387,8 @@ class Game {
             }
         }
 
-        return { size, cells };
+        //console.log(`floodFill - size: ${size}, color: ${color}, cells:`, cells);
+        return { size, color, cells };
     }
 
     isBoardFull() {
@@ -1368,7 +1399,7 @@ class Game {
                 }
             }
         }
-        console.log('Brett komplett gefüllt - prüfe größtes Gebiet...');
+        console.log('Mensch: Brett komplett gefüllt!');
         return true;
     }
 
